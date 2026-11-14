@@ -62,3 +62,22 @@ App 可直连；连到不给 IPv6 的 WiFi（例如校园网、手机热点共�
 - 用户填的账号密码存 App 私有 `localStorage`，CK 存 `CookieManager`，
   账单存 App 私有文件，普通应用读不到。
 - `app/debug.keystore` 是自签调试密钥，公开无妨，但别拿它签正式发布包。
+
+## 仓库维护：上传办法（沿用 GBO 项目）
+
+不用本机 git、不用 gh CLI、不用网页上传，走 **GitHub REST Git Data API**：
+
+1. 令牌：环境变量 `GHPAT`，classic PAT 必须带 **`workflow` scope**（只勾 `repo` 时写
+   `.github/workflows/` 会被 API 拒）；出网走 `127.0.0.1:7897` 代理。
+2. 每个文件 `POST /git/blobs`（`content` 为 base64，二进制 keystore 也一样）。
+3. `POST /git/trees`，更新时带 `base_tree`（当前 `refs/heads/main` 的 sha）。
+4. `POST /git/commits` → `PATCH /git/refs/heads/main`（首次创建用 `POST /git/refs`）。
+   所有文件合成**一个 commit**，只触发一次 CI，避免连跑好几个构建。
+5. **全新空仓库**的 Git Data API 会报 `409 Git Repository is empty`：先调一次
+   Contents API `PUT /contents/README.md` 造初始 commit（此时还没有 workflow 文件，
+   不会触发 CI），再按上面步骤推送。
+
+配套脚本在本地 `_local/`（`push.py` / `gh.py` / `poll.py` / `download.py`），
+被 `.gitignore` 排除、不入库；`poll.py` 轮询 run，`download.py` 用「先取 302 Location、
+再无 auth 下载」两步取回制品 APK 并校验签名。
+
