@@ -90,18 +90,7 @@
   <div class="warn">⚠️ 下面每个操作都会<strong>真实修改服务端数据</strong>（发卡会占用额度、触发上游登录；改档位/改模式会触发服务端重跑）。执行前会二次确认，建议先小批量试跑。</div>
 
   <div class="card">
-    <h2>1 · 登录取得会话</h2>
-    <div class="row">
-      <div style="flex:1;min-width:150px"><label>用户名</label><input id="u" autocomplete="username"></div>
-      <div style="flex:1;min-width:150px"><label>密码</label><input id="p" type="password" autocomplete="current-password"></div>
-      <div><label>&nbsp;</label><button class="primary" id="btnLogin">登录</button></div>
-      <div><label>&nbsp;</label><button id="btnMe">检查登录态</button></div>
-    </div>
-    <div class="foot" id="authInfo">如果原网页已经登录，会话是共享的，可直接使用下面功能，不必再登录。</div>
-  </div>
-
-  <div class="card">
-    <h2>2 · 账号列表</h2>
+    <h2>1 · 账号列表</h2>
     <div class="row" style="margin-bottom:9px">
       <button id="btnRefresh" class="primary">刷新列表</button>
       <button id="btnAll">全选</button>
@@ -118,7 +107,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2>3 · 批量发卡</h2>
+      <h2>2 · 批量发卡</h2>
       <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
       <div style="height:8px"></div>
       <div class="row">
@@ -136,7 +125,7 @@
     </div>
 
     <div class="card">
-      <h2>4 · 改额度（对选中账号）</h2>
+      <h2>3 · 改额度（对选中账号）</h2>
       <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
       <div style="height:10px"></div>
       <button class="primary" id="btnQuota">批量改额度</button>
@@ -144,7 +133,7 @@
     </div>
 
     <div class="card">
-      <h2>5 · 改档位（对选中账号）</h2>
+      <h2>4 · 改档位（对选中账号）</h2>
       <label>目标档位 tier</label><select id="tierVal"></select>
       <div style="height:10px"></div>
       <button class="primary" id="btnTier">批量换档位</button>
@@ -152,7 +141,7 @@
     </div>
 
     <div class="card">
-      <h2>6 · 改模式 / 改昵称</h2>
+      <h2>5 · 改模式 / 改昵称</h2>
       <label>模式</label><select id="modeVal"></select>
       <div style="height:8px"></div>
       <button class="primary" id="btnMode">批量改模式</button>
@@ -265,7 +254,7 @@ function setBadge(text, ok){
 
 async function checkMe(){
   try { const m = await api.me(); setBadge('已登录 · ' + (m.username || m.name || 'OK'), true); return true; }
-  catch(e){ setBadge('未登录', false); $('#authInfo').textContent = '未登录或会话失效：请填用户名密码登录（或先在原网页登录）。'; return false; }
+  catch(e){ setBadge('未登录 · 请在主面板「配置」里填账号密码', false); return false; }
 }
 
 async function loadMeta(){
@@ -337,14 +326,6 @@ async function runBatch(ids, fn, label){
   log('完成：成功 ' + ok + '，失败 ' + fail);
   return {ok, fail};
 }
-
-$('#btnMe').onclick = checkMe;
-$('#btnLogin').onclick = async () => {
-  const u = $('#u').value.trim(), p = $('#p').value;
-  if (!u || !p){ alert('请填用户名和密码'); return; }
-  try { await api.login(u, p); $('#p').value = ''; log('登录成功'); await checkMe(); await loadMeta(); await refresh(); }
-  catch(e){ log('登录失败：' + e.message); alert('登录失败：' + e.message); }
-};
 
 async function refresh(){
   try { const r = await api.accounts(); render(r.items || []); }

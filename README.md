@@ -63,6 +63,22 @@ App 可直连；连到不给 IPv6 的 WiFi（例如校园网、手机热点共�
   账单存 App 私有文件，普通应用读不到。
 - `app/debug.keystore` 是自签调试密钥，公开无妨，但别拿它签正式发布包。
 
+## 版本更新与覆盖安装（v1.0.1+）
+
+- **签名固定**：`app/debug.keystore` 提交在仓库，`app/build.gradle` 的 `signingConfigs.qbtun`
+  直接引用它；CI 每次 checkout 同一把钥匙，产物证书 SHA256 恒为
+  `8d4013798b5331866a84bba9753c9902f4231d8676e443ee2a0fa6950ba8dd5d`。
+- **versionCode 单调递增**（1 → 2 → …），避免 `INSTALL_FAILED_VERSION_DOWNGRADE`。
+- 覆盖安装三条件：同包名 `com.yinhush.qbtun` + 同签名证书 + versionCode 不降级。
+  v1.0.0 与 v1.0.1 用的是同一把钥匙，**可直接覆盖安装，不需要先卸载**。
+- 校验方法：`_local/download.py` 会比对签名证书 DER 是否嵌在 APK Signing Block 里；
+  也可用 `aapt2 dump badging <apk>` 看 versionCode。
+- GBO 项目早期踩过的坑（不要再犯）：CI 每次新环境现生成随机 `~/.android/debug.keystore`，
+  后来 `actions/cache` 又把缓存里的随机钥匙覆盖回工作区 → 每次签名证书不同 →
+  `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，必须卸载重装。根治是把固定 keystore 提交进仓库、
+  构建后 `zipalign` + `apksigner sign --ks` 强制重签并打印指纹核对；
+  用旧随机钥匙装过的包需要**先卸载一次**，之后同钥匙才能永久覆盖安装。
+
 ## 仓库维护：上传办法（沿用 GBO 项目）
 
 不用本机 git、不用 gh CLI、不用网页上传，走 **GitHub REST Git Data API**：
