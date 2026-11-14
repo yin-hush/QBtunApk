@@ -1,0 +1,19 @@
+{
+  "site": "https://tj.2.wffwff.cn:6789",
+  "api": {
+    "me": "/api/me",
+    "login": "/api/login",
+    "accounts": "/api/shop/qb/accounts",
+    "meta": "/api/shop/qb/meta",
+    "home": "/api/shop/home",
+    "cardNew": "/api/shop/qb/card/new",
+    "cardClaim": "/api/shop/qb/card/claim",
+    "quota": "/api/shop/qb/accounts/quota",
+    "tier": "/api/shop/qb/accounts/switch-tier",
+    "mode": "/api/shop/qb/accounts/mode",
+    "note": "/api/shop/qb/accounts/note",
+    "delete": "/api/shop/qb/accounts/delete",
+    "recheck": "/api/shop/qb/accounts/recheck"
+  },
+  "note": "站点与接口映射；账号密码由使用者在 App 内填写，绝不写入此文件"
+}

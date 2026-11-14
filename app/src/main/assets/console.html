@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QB囤 · 批量控制台</title>
+<style>
+  :root{
+    --brand:#1fa987; --brand-weak:#e2f5ee; --ink:#14261f; --sub:#5e756c;
+    --line:#e2ebe6; --bg:#f5f8f6; --card:#fff; --warn:#b9751f; --danger:#d6453c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:18px;background:var(--bg);color:var(--ink);
+       font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+  h1{font-size:19px;margin:0}
+  .links a{color:var(--brand);text-decoration:none;margin-right:12px;font-size:13px}
+  .links a:hover{text-decoration:underline}
+  .badge{padding:3px 10px;border-radius:999px;background:#e8eef0;color:var(--sub);font-size:12px}
+  .badge.ok{background:var(--brand-weak);color:#137a63}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:14px 16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(20,38,31,.04)}
+  .card h2{font-size:14px;margin:0 0 10px;color:var(--ink)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+  label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
+  input,select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;
+               background:#fff;color:var(--ink);font:inherit;font-size:13px}
+  input[type=checkbox]{width:auto}
+  button{padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;
+         color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+  button:hover{border-color:var(--brand)}
+  button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  button.primary:hover{filter:brightness(.94)}
+  button.danger{color:var(--danger)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .hint{font-size:12px;color:var(--sub)}
+  .warn{background:#fff8ec;border:1px solid #f0dcb8;color:#8a5a10;
+        padding:8px 11px;border-radius:8px;font-size:12px;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  th{color:var(--sub);font-weight:600;background:#fafcfb}
+  tbody tr:hover{background:#f7fbf9}
+  .tbl-wrap{overflow:auto;max-height:390px;border:1px solid var(--line);border-radius:8px}
+  .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--brand-weak);
+       color:#137a63;font-size:11px}
+  pre{background:#0f1a16;color:#c9e8dc;padding:11px;border-radius:8px;font-size:12px;
+      max-height:230px;overflow:auto;margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
+  textarea{width:100%;min-height:96px;padding:9px;border:1px solid var(--line);border-radius:8px;
+           font:12px/1.5 Consolas,monospace;resize:vertical}
+  .foot{margin-top:8px;font-size:12px;color:var(--sub)}
+  .qstats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .q{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fbfdfc}
+  .q span{display:block;font-size:11.5px;color:var(--sub)}
+  .q b{display:block;font-size:19px;margin-top:2px}
+  @media(max-width:720px){.qstats{grid-template-columns:repeat(2,1fr)}}
+
+  @media(max-width:720px){
+    body{padding:10px}
+    header{gap:8px;margin-bottom:10px}
+    header .hint{display:none}
+    h1{font-size:16px}
+    .card{padding:10px;margin-bottom:10px}
+    .tbl-wrap{max-height:280px}
+    .links a{font-size:11px;margin-right:8px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>QB囤 · 批量控制台</h1>
+    <span class="links"><a href="/">原网页（原封不动）</a><a href="/__tool">工具页</a></span>
+    <span id="authBadge" class="badge">未检测登录态</span>
+    <span class="hint">同源直连 · 需手机网络支持 IPv6 或有全局代理</span>
+  </header>
+
+  <div class="card" id="quotaCard">
+    <h2>额度统计</h2>
+    <div class="qstats">
+      <div class="q"><span>剩余总额度</span><b id="qTotal">—</b></div>
+      <div class="q"><span>已分配</span><b id="qAlloc">—</b></div>
+      <div class="q"><span>未分配</span><b id="qFree">—</b></div>
+      <div class="q"><span>已用额度（所有账号合计）</span><b id="qUsed">—</b></div>
+    </div>
+    <div class="foot" id="qMeta" style="margin-top:7px">额度账单：quota_log.txt（每次启动记录）</div>
+  </div>
+
+  <div class="warn">⚠️ 下面每个操作都会<strong>真实修改服务端数据</strong>（发卡会占用额度、触发上游登录；改档位/改模式会触发服务端重跑）。执行前会二次确认，建议先小批量试跑。</div>
+
+  <div class="card">
+    <h2>1 · 登录取得会话</h2>
+    <div class="row">
+      <div style="flex:1;min-width:150px"><label>用户名</label><input id="u" autocomplete="username"></div>
+      <div style="flex:1;min-width:150px"><label>密码</label><input id="p" type="password" autocomplete="current-password"></div>
+      <div><label>&nbsp;</label><button class="primary" id="btnLogin">登录</button></div>
+      <div><label>&nbsp;</label><button id="btnMe">检查登录态</button></div>
+    </div>
+    <div class="foot" id="authInfo">如果原网页已经登录，会话是共享的，可直接使用下面功能，不必再登录。</div>
+  </div>
+
+  <div class="card">
+    <h2>2 · 账号列表</h2>
+    <div class="row" style="margin-bottom:9px">
+      <button id="btnRefresh" class="primary">刷新列表</button>
+      <button id="btnAll">全选</button>
+      <button id="btnNone">清空选择</button>
+      <span class="hint" id="selInfo">未加载</span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th></th><th>id</th><th>QQ</th><th>昵称</th><th>档位</th><th>模式</th><th>额度</th><th>已用</th><th>状态</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="9" class="hint">点「刷新列表」加载</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>3 · 批量发卡</h2>
+      <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
+      <div style="height:8px"></div>
+      <div class="row">
+        <div style="flex:1"><label>档位 tier</label><select id="cardTier"></select></div>
+        <div style="flex:1"><label>额度 quota</label><input id="cardQuota" value="20"></div>
+      </div>
+      <div style="height:8px"></div>
+      <div class="row">
+        <div style="flex:1"><label>备注 note</label><input id="cardNote" value=""></div>
+        <div style="flex:1"><label>模式</label><select id="cardMode"></select></div>
+      </div>
+      <div style="height:10px"></div>
+      <button class="primary" id="btnCard">生成卡密链接</button>
+      <div class="foot">结果会列在下方，可一键复制。</div>
+    </div>
+
+    <div class="card">
+      <h2>4 · 改额度（对选中账号）</h2>
+      <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
+      <div style="height:10px"></div>
+      <button class="primary" id="btnQuota">批量改额度</button>
+      <div class="foot">接口：/qb/accounts/quota，body {id, quota}</div>
+    </div>
+
+    <div class="card">
+      <h2>5 · 改档位（对选中账号）</h2>
+      <label>目标档位 tier</label><select id="tierVal"></select>
+      <div style="height:10px"></div>
+      <button class="primary" id="btnTier">批量换档位</button>
+      <div class="foot">接口：/qb/accounts/switch-tier，较慢，串行执行</div>
+    </div>
+
+    <div class="card">
+      <h2>6 · 改模式 / 改昵称</h2>
+      <label>模式</label><select id="modeVal"></select>
+      <div style="height:8px"></div>
+      <button class="primary" id="btnMode">批量改模式</button>
+      <div style="height:10px"></div>
+      <label>昵称 note</label><input id="noteVal" placeholder="留空表示清空昵称">
+      <div style="height:8px"></div>
+      <button id="btnNote">批量改昵称</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>执行设置</h2>
+    <div class="row">
+      <div style="width:130px"><label>每次间隔（秒）</label><input id="delay" type="number" value="1" min="0" step="0.2"></div>
+      <div style="padding-top:18px"><label style="display:inline"><input type="checkbox" id="stopOnErr" checked> 出错立即停止</label></div>
+      <div style="padding-top:18px"><button id="btnClear">清空日志</button></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>执行日志</h2>
+    <pre id="log">等待操作…</pre>
+  </div>
+
+  <div class="card">
+    <h2>卡密链接结果 <span class="hint" id="cardCount"></span></h2>
+    <textarea id="cardResults" placeholder="批量发卡生成的链接会出现在这里"></textarea>
+    <div style="margin-top:8px"><button id="btnCopy">复制全部</button></div>
+  </div>
+
+</div>
+
+<script src="/__app.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// 顶部额度统计区（安卓版：数据来自同源 API，由 app.js 计算）
+(async function quotaPanel(){
+  const meta = document.getElementById('qMeta');
+  try {
+    const s = await QB.status();
+    const q = s.stats;
+    if (q){
+      document.getElementById('qTotal').textContent = q.total;
+      document.getElementById('qAlloc').textContent = q.allocated;
+      document.getElementById('qFree').textContent  = q.free;
+      document.getElementById('qUsed').textContent  = q.used;
+    }
+    meta.textContent = '账号数 ' + (q ? q.accounts : '—')
+      + ' · 统计时间 ' + (s.statsAt || '—')
+      + ' · 额度账单：quota_log.txt（App 私有文件）';
+  } catch(e){ meta.textContent = '额度统计读取失败：' + e.message; }
+})();
+let ITEMS = [];
+
+function log(msg){
+  const el = $('#log');
+  if (el.textContent === '等待操作…') el.textContent = '';
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+async function call(path, body){
+  const opt = {
+    method: body === undefined ? 'GET' : 'POST',
+    credentials: 'same-origin',
+    headers: { 'Accept': '*/*', 'Content-Type': 'application/json' }
+  };
+  if (body !== undefined) opt.body = JSON.stringify(body);
+  const r = await fetch(path, opt);
+  let j = null;
+  try { j = await r.json(); } catch(e) { throw new Error('响应不是 JSON，HTTP ' + r.status); }
+  if (!r.ok || (j && j.ok === false)) {
+    throw new Error((j && (j.message || j.code)) || ('HTTP ' + r.status));
+  }
+  return j;
+}
+
+// 接口路径从 config.json 读取（由本地服务 /__api 下发），换站点只改配置不改代码
+let APIS = {
+  login:'/api/login', me:'/api/me', meta:'/api/shop/qb/meta',
+  accounts:'/api/shop/qb/accounts', cardNew:'/api/shop/qb/card/new',
+  quota:'/api/shop/qb/accounts/quota', tier:'/api/shop/qb/accounts/switch-tier',
+  mode:'/api/shop/qb/accounts/mode', note:'/api/shop/qb/accounts/note'
+};
+async function loadApis(){
+  try {
+    const d = await (await fetch('/__api', {cache:'no-store'})).json();
+    if (d && d.api) APIS = Object.assign({}, APIS, d.api);
+  } catch(e){ /* 用兜底路径 */ }
+}
+const api = {
+  login:   (u,p) => call(APIS.login, {username:u, password:p}),
+  me:      ()     => call(APIS.me),
+  meta:    ()     => call(APIS.meta),
+  accounts:()     => call(APIS.accounts),
+  card:    b      => call(APIS.cardNew, b),
+  quota:   (id,v) => call(APIS.quota, {id, quota:String(v)}),
+  tier:    (id,t) => call(APIS.tier, {id, tier:String(t)}),
+  mode:    (id,m) => call(APIS.mode, {id, mode:m}),
+  note:    (id,n) => call(APIS.note, {id, note:n})
+};
+
+function setBadge(text, ok){
+  const b = $('#authBadge');
+  b.textContent = text;
+  b.className = 'badge' + (ok ? ' ok' : '');
+}
+
+async function checkMe(){
+  try { const m = await api.me(); setBadge('已登录 · ' + (m.username || m.name || 'OK'), true); return true; }
+  catch(e){ setBadge('未登录', false); $('#authInfo').textContent = '未登录或会话失效：请填用户名密码登录（或先在原网页登录）。'; return false; }
+}
+
+async function loadMeta(){
+  try {
+    const m = await api.meta();
+    const tiers = m.tiers || [];
+    const modes = m.modes || [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}];
+    const fill = (sel, list, valKey, labelKey, fallback) => {
+      const el = $(sel), old = el.value;
+      el.innerHTML = '';
+      (list.length ? list : fallback).forEach(x => {
+        const o = document.createElement('option');
+        o.value = String(x[valKey]); o.textContent = String(x[labelKey] || x[valKey]);
+        el.appendChild(o);
+      });
+      if (old) el.value = old;
+    };
+    fill('#cardTier', tiers, 'key', 'label', [{key:'1',label:'1起'}]);
+    fill('#tierVal',  tiers, 'key', 'label', [{key:'1',label:'1起'}]);
+    fill('#cardMode', modes, 'value', 'label', [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}]);
+    fill('#modeVal',  modes, 'value', 'label', [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}]);
+    log('已加载档位 ' + tiers.length + ' 个、模式 ' + modes.length + ' 个');
+  } catch(e){ log('读取档位失败：' + e.message); }
+}
+
+function render(items){
+  ITEMS = items || [];
+  const tb = $('#tbody');
+  tb.innerHTML = '';
+  if (!ITEMS.length){ tb.innerHTML = '<tr><td colspan="9" class="hint">暂无账号</td></tr>'; }
+  ITEMS.forEach(it => {
+    const tr = document.createElement('tr');
+    const cell = v => '<td>' + (v === undefined || v === null || v === '' ? '—' : String(v)) + '</td>';
+    tr.innerHTML = '<td><input type="checkbox" class="pick" value="' + it.id + '"></td>'
+      + cell(it.id) + cell(it.qq) + cell(it.note)
+      + cell(it.tierLabel || it.tier) + cell(it.modeText || it.mode)
+      + cell(it.quota) + cell(it.used)
+      + '<td><span class="tag">' + (it.status || '—') + '</span></td>';
+    tb.appendChild(tr);
+  });
+  updateSel();
+  log('账号列表：' + ITEMS.length + ' 条');
+}
+
+function updateSel(){
+  const n = document.querySelectorAll('.pick:checked').length;
+  $('#selInfo').textContent = '已选 ' + n + ' / ' + ITEMS.length;
+}
+
+function picked(){
+  return Array.from(document.querySelectorAll('.pick:checked')).map(x => Number(x.value));
+}
+
+function confirmRun(label, ids, param){
+  return confirm('将对 ' + ids.length + ' 个账号执行「' + label + '」\n参数：' + param
+    + '\n\n这会真实修改服务端数据，确定继续？');
+}
+
+async function runBatch(ids, fn, label){
+  const delay = Math.max(0, parseFloat($('#delay').value) || 0);
+  const stop = $('#stopOnErr').checked;
+  let ok = 0, fail = 0;
+  for (let i = 0; i < ids.length; i++){
+    log('[' + (i+1) + '/' + ids.length + '] ' + label + ' id=' + ids[i] + ' …');
+    try { const r = await fn(ids[i]); ok++; log('   ✓ ' + (r && r.url ? r.url : 'OK')); }
+    catch(e){ fail++; log('   ✗ ' + e.message); if (stop) break; }
+    if (i < ids.length - 1 && delay) await sleep(delay * 1000);
+  }
+  log('完成：成功 ' + ok + '，失败 ' + fail);
+  return {ok, fail};
+}
+
+$('#btnMe').onclick = checkMe;
+$('#btnLogin').onclick = async () => {
+  const u = $('#u').value.trim(), p = $('#p').value;
+  if (!u || !p){ alert('请填用户名和密码'); return; }
+  try { await api.login(u, p); $('#p').value = ''; log('登录成功'); await checkMe(); await loadMeta(); await refresh(); }
+  catch(e){ log('登录失败：' + e.message); alert('登录失败：' + e.message); }
+};
+
+async function refresh(){
+  try { const r = await api.accounts(); render(r.items || []); }
+  catch(e){ log('读取账号失败：' + e.message); }
+}
+$('#btnRefresh').onclick = refresh;
+$('#btnAll').onclick  = () => { document.querySelectorAll('.pick').forEach(x => x.checked = true); updateSel(); };
+$('#btnNone').onclick = () => { document.querySelectorAll('.pick').forEach(x => x.checked = false); updateSel(); };
+$('#tbody').addEventListener('change', updateSel);
+
+$('#btnCard').onclick = async () => {
+  const n = Math.min(50, Math.max(1, parseInt($('#cardN').value, 10) || 1));
+  const body = {
+    tier: $('#cardTier').value,
+    quota: $('#cardQuota').value,
+    note: $('#cardNote').value,
+    mode: $('#cardMode').value
+  };
+  if (!confirm('将生成 ' + n + ' 张卡密，每张额度 ' + body.quota
+      + '。\n发卡会占用账户额度并触发上游登录，确定继续？')) return;
+  const urls = [];
+  const delay = Math.max(0, parseFloat($('#delay').value) || 0);
+  for (let i = 0; i < n; i++){
+    log('[发卡 ' + (i+1) + '/' + n + '] …');
+    try {
+      const r = await api.card(body);
+      urls.push(r.url);
+      log('   ✓ ' + r.url + '   card ' + (r.card || ''));
+    } catch(e){ log('   ✗ ' + e.message); if ($('#stopOnErr').checked) break; }
+    if (i < n - 1 && delay) await sleep(delay * 1000);
+  }
+  const old = $('#cardResults').value.trim();
+  $('#cardResults').value = (old ? old + '\n' : '') + urls.join('\n');
+  $('#cardCount').textContent = '本次新增 ' + urls.length + ' 条';
+  log('发卡完成，共 ' + urls.length + ' 条链接');
+};
+
+$('#btnQuota').onclick = async () => {
+  const ids = picked(); const v = $('#quotaVal').value.trim();
+  if (!ids.length || v === ''){ alert('请勾选账号并填写额度'); return; }
+  if (!confirmRun('改额度', ids, 'quota=' + v)) return;
+  await runBatch(ids, id => api.quota(id, v), '改额度 → ' + v);
+  await refresh();
+};
+
+$('#btnTier').onclick = async () => {
+  const ids = picked(); const t = $('#tierVal').value;
+  if (!ids.length){ alert('请勾选账号'); return; }
+  if (!confirmRun('换档位', ids, 'tier=' + t)) return;
+  await runBatch(ids, id => api.tier(id, t), '换档位 → ' + t);
+  await refresh();
+};
+
+$('#btnMode').onclick = async () => {
+  const ids = picked(); const m = $('#modeVal').value;
+  if (!ids.length){ alert('请勾选账号'); return; }
+  if (!confirmRun('改模式', ids, 'mode=' + m)) return;
+  await runBatch(ids, id => api.mode(id, m), '改模式 → ' + m);
+  await refresh();
+};
+
+$('#btnNote').onclick = async () => {
+  const ids = picked(); const n = $('#noteVal').value;
+  if (!ids.length){ alert('请勾选账号'); return; }
+  if (!confirmRun('改昵称', ids, 'note=' + (n || '(清空)') + '（所有选中项设为同一值）')) return;
+  await runBatch(ids, id => api.note(id, n), '改昵称');
+  await refresh();
+};
+
+$('#btnClear').onclick = () => { $('#log').textContent = '等待操作…'; };
+$('#btnCopy').onclick = async () => {
+  const t = $('#cardResults');
+  if (!t.value.trim()){ alert('还没有结果'); return; }
+  try { await navigator.clipboard.writeText(t.value); log('已复制全部链接'); }
+  catch(e){ t.select(); document.execCommand('copy'); log('已复制（兼容模式）'); }
+};
+
+(async function init(){
+  await QB.ready();          // 等自动登录完成（CK 复用 / 密码兜底）
+  await loadApis();
+  const ok = await checkMe();
+  if (ok){ await loadMeta(); await refresh(); }
+  else { await loadMeta().catch(()=>{}); }
+})();
+</script>
+</body>
+</html>

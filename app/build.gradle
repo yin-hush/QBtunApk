@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.yinhush.qbtun'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.yinhush.qbtun'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    // 固定调试签名：每次 CI 构建用同一把钥匙，后续版本可直接覆盖安装
+    signingConfigs {
+        qbtun {
+            storeFile file('debug.keystore')
+            storePassword 'qbtun2026'
+            keyAlias 'qbtun'
+            keyPassword 'qbtun2026'
+            storeType 'PKCS12'
+        }
+    }
+
+    buildTypes {
+        debug   { signingConfig signingConfigs.qbtun }
+        release { signingConfig signingConfigs.qbtun; minifyEnabled false }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// 只用 Android 框架自带的 WebView，无第三方依赖，CI 构建更快也更稳
+dependencies { }

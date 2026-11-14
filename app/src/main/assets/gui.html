@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QB囤 · 安卓版</title>
+<style>
+  :root{
+    --brand:#1fa987; --brand-weak:#e2f5ee; --ink:#14261f; --sub:#5e756c;
+    --line:#e2ebe6; --bg:#f5f8f6; --card:#fff; --danger:#d6453c;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{background:var(--bg);color:var(--ink);font:14px/1.55 -apple-system,BlinkMacSystemFont,
+       "Segoe UI","Microsoft YaHei",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 16px;
+         background:#fff;border-bottom:1px solid var(--line)}
+  h1{font-size:16px;margin:0}
+  .ver{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+  .badge{padding:3px 10px;border-radius:999px;background:#e8eef0;color:var(--sub);font-size:12px}
+  .badge.ok{background:var(--brand-weak);color:#137a63}
+  .addr{font-size:12px;color:var(--sub)}
+  .spacer{flex:1}
+  button{padding:6px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;
+         color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
+  button:hover{border-color:var(--brand)}
+  button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px 4px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px}
+  .stat span{display:block;font-size:11.5px;color:var(--sub)}
+  .stat b{display:block;font-size:21px;font-weight:650;margin-top:2px;letter-spacing:.2px}
+  .stat:nth-child(3) b{color:var(--brand)}
+  .subline{padding:2px 18px 8px;font-size:11.5px;color:var(--sub)}
+
+  .card{margin:0 16px 10px;background:#fff;border:1px solid var(--line);
+        border-radius:10px;padding:10px 13px}
+  .card h2{font-size:13px;margin:0 0 8px}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .fld{flex:1;min-width:150px}
+  label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:3px}
+  input{width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:7px;
+        background:#fff;color:var(--ink);font:inherit;font-size:12.5px}
+  .msg{font-size:12px;color:var(--sub)}
+
+  .tabs{display:flex;gap:8px;align-items:center;padding:4px 16px 8px}
+  .frames{flex:1;margin:0 16px 10px;border:1px solid var(--line);border-radius:10px;
+          overflow:hidden;background:#fff;position:relative}
+  iframe{width:100%;height:100%;border:0;display:block}
+  .billpanel{flex:1;margin:0 16px 12px;background:#fff;border:1px solid var(--line);
+             border-radius:10px;padding:12px 14px;flex-direction:column;overflow:hidden}
+  .billhead{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+  .billhead h2{font-size:13px;margin:0}
+  .billhead button{padding:4px 11px;font-size:12px}
+  .billhead .addr{font-size:11.5px}
+  #bill{flex:1;margin:0;font:12px/1.8 Consolas,monospace;color:var(--ink);
+        overflow:auto;white-space:pre-wrap;word-break:break-all}
+
+  /* 安卓窄屏适配：其余样式与桌面版一致 */
+  @media(max-width:720px){
+    header{padding:8px 10px;gap:8px}
+    h1{font-size:14px}
+    .addr{display:none}
+    .stats{grid-template-columns:repeat(2,1fr);gap:8px;padding:8px 10px 2px}
+    .stat{padding:7px 10px}
+    .stat b{font-size:18px}
+    .card{margin:0 10px 8px;padding:9px 10px}
+    .fld{min-width:130px}
+    .tabs{padding:4px 10px 8px;gap:6px}
+    .tabs .addr{display:none}
+    .tabs button{padding:6px 9px}
+    .frames{margin:0 10px 8px}
+    .billpanel{margin:0 10px 10px;padding:10px}
+    .subline{padding:2px 12px 6px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.0</span>
+  <span id="badge" class="badge">启动中…</span>
+  <span class="addr" id="addr"></span>
+  <span class="spacer"></span>
+  <button id="btnRefresh">刷新状态</button>
+  <button id="btnCfg">配置</button>
+  <button id="btnRelogin">重新登录</button>
+</header>
+
+<div class="stats">
+  <div class="stat"><span>剩余总额度</span><b id="qTotal">—</b></div>
+  <div class="stat"><span>已分配</span><b id="qAlloc">—</b></div>
+  <div class="stat"><span>未分配</span><b id="qFree">—</b></div>
+  <div class="stat"><span>已用额度（所有账号合计）</span><b id="qUsed">—</b></div>
+</div>
+<div class="subline" id="subline">账号数 — · 统计时间 — · 额度账单：quota_log.txt（App 私有文件）</div>
+
+<div class="card" id="cfgPanel" style="display:none">
+  <h2>配置（保存在本机 App 私有存储，请勿外发）</h2>
+  <div class="row">
+    <div class="fld"><label>用户名</label><input id="cfgUser" autocomplete="username"></div>
+    <div class="fld"><label>密码（留空 = 不修改）</label><input id="cfgPass" type="password"></div>
+    <div class="fld"><label>CK（留空 = 清空并用密码重新登录）</label><input id="cfgCk"></div>
+    <div class="fld" style="display:none"><label>出网代理（安卓版不使用）</label><input id="cfgProxy"></div>
+    <div class="fld"><label>站点 site（config.json，接口路径在 api 段）</label><input id="cfgSite"></div>
+    <div><button class="on" id="btnSave">保存并重新登录</button></div>
+  </div>
+  <div class="msg" id="cfgMsg" style="margin-top:7px"></div>
+</div>
+
+<div class="tabs">
+  <button id="tabTool" class="on">批量控制台</button>
+  <button id="tabOrigin">原网页（原封不动）</button>
+  <button id="tabBill">额度账单</button>
+  <span class="addr">三个页面同源，共用同一份登录态</span>
+</div>
+
+<div class="frames" id="framesBox">
+  <iframe id="frameTool" src="/__tool"></iframe>
+  <iframe id="frameOrigin" style="display:none"></iframe>
+</div>
+
+<div class="billpanel" id="billPanel" style="display:none">
+  <div class="billhead">
+    <h2>额度账单（有效数据）</h2>
+    <button id="billCompact" class="on">精简展示</button>
+    <button id="billAll">全部展示</button>
+    <span class="addr">quota_log.txt（App 私有文件）· 精简 = 每天最后一条 + 总额度变动点</span>
+  </div>
+  <pre id="bill">读取中…</pre>
+</div>
+
+<script src="/__app.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+let originLoaded = false;
+
+// 0.0.2+：额度账单（有效数据），全部 / 精简两种展示
+let BILL_MODE = 'compact';
+let BILL_DATA = {all:[], compact:[]};
+
+async function loadBill(){
+  try {
+    const d = await QB.bill();
+    BILL_DATA = d;
+    renderBill();
+  } catch(e){ $('#bill').textContent = '账单读取失败：' + e.message; }
+}
+function renderBill(){
+  const rows = BILL_DATA[BILL_MODE] || [];
+  $('#bill').textContent = rows.length
+    ? rows.map(r => r.display).join('\n')
+    : '（暂无有效记录）';
+}
+$('#billCompact').onclick = () => {
+  BILL_MODE = 'compact'; $('#billCompact').className = 'on'; $('#billAll').className = ''; renderBill();
+};
+$('#billAll').onclick = () => {
+  BILL_MODE = 'all'; $('#billAll').className = 'on'; $('#billCompact').className = ''; renderBill();
+};
+
+async function refresh(){
+  try {
+    const s = await QB.status();
+    const q = s.stats;
+    $('#qTotal').textContent = q ? q.total : '—';
+    $('#qAlloc').textContent = q ? q.allocated : '—';
+    $('#qFree').textContent  = q ? q.free : '—';
+    $('#qUsed').textContent  = q ? q.used : '—';
+    $('#subline').textContent = '账号数 ' + (q ? q.accounts : '—')
+      + ' · 统计时间 ' + (s.statsAt || '—')
+      + ' · 额度账单：quota_log.txt（App 私有文件）';
+    const b = $('#badge');
+    if (s.login === 'ok'){
+      const src = {cookie:'复用 CK', password:'密码登录并更新 CK'}[s.source] || s.source;
+      b.textContent = '已登录 · ' + src; b.className = 'badge ok';
+    } else {
+      b.textContent = '未登录（点「配置」填账号密码）'; b.className = 'badge';
+    }
+    $('#addr').textContent = '安卓版 · 同源直连 → ' + s.upstream;
+    $('#cfgUser').value = s.config.username || '';
+    $('#cfgProxy').value = s.config.proxy || '';
+    $('#cfgSite').value = s.config.site || s.upstream || '';
+    $('#cfgCk').placeholder = s.config.hasCookie ? ('当前：' + s.config.cookiePreview) : '（无 CK）';
+    await loadBill();
+  } catch(e){
+    $('#badge').textContent = '状态读取失败：' + e.message;
+  }
+}
+
+function tab(which){
+  const bill = which === 'bill';
+  $('#tabTool').className   = which === 'tool'   ? 'on' : '';
+  $('#tabOrigin').className = which === 'origin' ? 'on' : '';
+  $('#tabBill').className   = bill ? 'on' : '';
+  $('#framesBox').style.display  = bill ? 'none' : 'block';
+  $('#billPanel').style.display  = bill ? 'flex' : 'none';
+  $('#frameTool').style.display   = which === 'tool'   ? 'block' : 'none';
+  $('#frameOrigin').style.display = which === 'origin' ? 'block' : 'none';
+  if (which === 'origin' && !originLoaded){ $('#frameOrigin').src = '/'; originLoaded = true; }
+  if (bill) loadBill();
+}
+
+$('#tabTool').onclick   = () => tab('tool');
+$('#tabOrigin').onclick = () => tab('origin');
+$('#tabBill').onclick   = () => tab('bill');
+$('#btnRefresh').onclick = refresh;
+$('#btnCfg').onclick = () => {
+  const p = $('#cfgPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+};
+$('#btnRelogin').onclick = async () => {
+  $('#cfgMsg').textContent = '正在重新登录…';
+  try { await QB.relogin(); await refresh(); reloadFrames(); $('#cfgMsg').textContent = '已重新登录'; }
+  catch(e){ $('#cfgMsg').textContent = '失败：' + e.message; }
+};
+$('#btnSave').onclick = async () => {
+  const body = {
+    username: $('#cfgUser').value.trim(),
+    password: $('#cfgPass').value,
+    cookie:   $('#cfgCk').value.trim(),
+    proxy:    $('#cfgProxy').value.trim(),
+    site:     $('#cfgSite').value.trim()
+  };
+  if (!body.username && !body.password && !body.cookie){
+    $('#cfgMsg').textContent = '请至少填写用户名 / 密码 / CK 中的一项'; return;
+  }
+  $('#cfgMsg').textContent = '保存并登录中…';
+  try {
+    const s = await QB.setConfig(body);
+    $('#cfgPass').value = ''; $('#cfgCk').value = '';
+    await refresh(); reloadFrames();
+    $('#cfgMsg').textContent = s.login === 'ok'
+      ? '保存成功，' + ({cookie:'CK 有效已复用', password:'已用密码登录并更新 CK'}[s.source] || '登录成功')
+      : '保存了，但登录失败：请检查账号密码 / 代理';
+  } catch(e){ $('#cfgMsg').textContent = '失败：' + e.message; }
+};
+
+function reloadFrames(){
+  try { $('#frameTool').contentWindow.location.reload(); } catch(e){}
+  if (originLoaded){ try { $('#frameOrigin').contentWindow.location.reload(); } catch(e){} }
+}
+
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>
