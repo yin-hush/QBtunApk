@@ -73,6 +73,7 @@
     <h1>QB囤 · 批量控制台</h1>
     <span class="links"><a href="/">原网页（原封不动）</a><a href="/__tool">工具页</a></span>
     <span id="authBadge" class="badge">未检测登录态</span>
+    <button id="btnForceRefresh" class="primary" style="padding:3px 12px;font-size:12px">立即刷新</button>
     <span class="hint">同源直连 · 需手机网络支持 IPv6 或有全局代理</span>
   </header>
 
@@ -107,25 +108,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2>2 · 批量发卡</h2>
-      <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
-      <div style="height:8px"></div>
-      <div class="row">
-        <div style="flex:1"><label>档位 tier</label><select id="cardTier"></select></div>
-        <div style="flex:1"><label>额度 quota</label><input id="cardQuota" value="20"></div>
-      </div>
-      <div style="height:8px"></div>
-      <div class="row">
-        <div style="flex:1"><label>备注 note</label><input id="cardNote" value=""></div>
-        <div style="flex:1"><label>模式</label><select id="cardMode"></select></div>
-      </div>
-      <div style="height:10px"></div>
-      <button class="primary" id="btnCard">生成卡密链接</button>
-      <div class="foot">结果会列在下方，可一键复制。</div>
-    </div>
-
-    <div class="card">
-      <h2>3 · 改额度（对选中账号）</h2>
+      <h2>2 · 改额度（对选中账号）</h2>
       <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
       <div style="height:10px"></div>
       <button class="primary" id="btnQuota">批量改额度</button>
@@ -133,7 +116,7 @@
     </div>
 
     <div class="card">
-      <h2>4 · 改档位（对选中账号）</h2>
+      <h2>3 · 改档位（对选中账号）</h2>
       <label>目标档位 tier</label><select id="tierVal"></select>
       <div style="height:10px"></div>
       <button class="primary" id="btnTier">批量换档位</button>
@@ -141,7 +124,7 @@
     </div>
 
     <div class="card">
-      <h2>5 · 改模式 / 改昵称</h2>
+      <h2>4 · 改模式 / 改昵称</h2>
       <label>模式</label><select id="modeVal"></select>
       <div style="height:8px"></div>
       <button class="primary" id="btnMode">批量改模式</button>
@@ -150,6 +133,24 @@
       <div style="height:8px"></div>
       <button id="btnNote">批量改昵称</button>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>5 · 批量发卡</h2>
+    <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
+    <div style="height:8px"></div>
+    <div class="row">
+      <div style="flex:1"><label>档位 tier</label><select id="cardTier"></select></div>
+      <div style="flex:1"><label>额度 quota</label><input id="cardQuota" value="20"></div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="row">
+      <div style="flex:1"><label>备注 note</label><input id="cardNote" value=""></div>
+      <div style="flex:1"><label>模式</label><select id="cardMode"></select></div>
+    </div>
+    <div style="height:10px"></div>
+    <button class="primary" id="btnCard">生成卡密链接</button>
+    <div class="foot">结果会列在下方，可一键复制。</div>
   </div>
 
   <div class="card">
@@ -180,7 +181,7 @@ const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // 顶部额度统计区（安卓版：数据来自同源 API，由 app.js 计算）
-(async function quotaPanel(){
+async function loadQuota(){
   const meta = document.getElementById('qMeta');
   try {
     const s = await QB.status();
@@ -195,7 +196,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
       + ' · 统计时间 ' + (s.statsAt || '—')
       + ' · 额度账单：quota_log.txt（App 私有文件）';
   } catch(e){ meta.textContent = '额度统计读取失败：' + e.message; }
-})();
+}
 let ITEMS = [];
 
 function log(msg){
@@ -331,7 +332,23 @@ async function refresh(){
   try { const r = await api.accounts(); render(r.items || []); }
   catch(e){ log('读取账号失败：' + e.message); }
 }
+
+// 立即刷新：重新检测登录态 + 重载档位 + 刷新账号列表 + 刷新额度统计
+async function refreshAll(){
+  const ok = await checkMe();
+  try { await loadMeta(); } catch(e){}
+  await refresh();
+  await loadQuota();
+  return ok;
+}
 $('#btnRefresh').onclick = refresh;
+$('#btnForceRefresh').onclick = async () => {
+  const btn = $('#btnForceRefresh');
+  const old = btn.textContent; btn.disabled = true; btn.textContent = '刷新中…';
+  try { const ok = await refreshAll(); log('已立即刷新（登录 ' + (ok ? 'OK' : '未登录') + '）'); }
+  catch(e){ log('刷新失败：' + e.message); }
+  finally { btn.disabled = false; btn.textContent = old; }
+};
 $('#btnAll').onclick  = () => { document.querySelectorAll('.pick').forEach(x => x.checked = true); updateSel(); };
 $('#btnNone').onclick = () => { document.querySelectorAll('.pick').forEach(x => x.checked = false); updateSel(); };
 $('#tbody').addEventListener('change', updateSel);
@@ -409,6 +426,7 @@ $('#btnCopy').onclick = async () => {
   const ok = await checkMe();
   if (ok){ await loadMeta(); await refresh(); }
   else { await loadMeta().catch(()=>{}); }
+  await loadQuota();
 })();
 </script>
 </body>
