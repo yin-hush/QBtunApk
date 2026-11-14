@@ -25,7 +25,8 @@
   `/api/login`，WebView 自动写入新 CK。也可手动粘贴电脑上的 CK。
 - **额度统计**：剩余总额度 / 已分配 / 未分配 / 已用额度（所有账号 `used` 合计），
   账单里额外记录 `历史总额度 = 剩余总额度 + 已用额度`。算法与桌面版 `server.py:quota_stats` 一致。
-- **额度账单**：每次启动追加一行到 App 私有 `quota_log.txt`；主面板第三标签用**表格**展示
+- **额度账单**：**2 小时内最多写一条**（2h 内已有任何日志就跳过），避免频繁启动把文件写爆；
+  桌面版 0.0.2 的 `server.py:write_bill` 是同一规则。主面板第三标签用**表格**展示
   有效数据（列为 时间 / 剩余总额度 / 已分配 / 未分配 / 已用额度 / 历史总额度），
   支持「全部展示 / 精简展示」（精简 = 每天最后一条 + 历史总额度变动点及变动前一条），
   窄屏可横向滚动。桌面版 0.0.2 的账单栏同样是表格。
@@ -66,12 +67,19 @@ App 可直连；连到不给 IPv6 的 WiFi（例如校园网、手机热点共�
   账单存 App 私有文件，普通应用读不到。
 - `app/debug.keystore` 是自签调试密钥，公开无妨，但别拿它签正式发布包。
 
+## v1.0.3 修复（安卓批量按钮无响应）
+- 症状：所有批量按钮点了没反应。根因是 WebView 默认**不显示 JS 对话框**，
+  `confirm()` 恒返回 false、`alert()` 静默消失，而每个批量操作都先走 `confirmRun()`。
+- 修法：`MainActivity` 设置 `WebChromeClient`，用原生 `AlertDialog` 接管
+  `onJsConfirm` / `onJsAlert` 并回调 `JsResult`；同时把 JS console 输出到 Logcat 便于排查。
+- 桌面版浏览器有原生 alert/confirm，不受此问题影响，无需改动这一处。
+
 ## 版本更新与覆盖安装（v1.0.1+）
 
 - **签名固定**：`app/debug.keystore` 提交在仓库，`app/build.gradle` 的 `signingConfigs.qbtun`
   直接引用它；CI 每次 checkout 同一把钥匙，产物证书 SHA256 恒为
   `8d4013798b5331866a84bba9753c9902f4231d8676e443ee2a0fa6950ba8dd5d`。
-- **versionCode 单调递增**（1 → 2 → 3 → …），避免 `INSTALL_FAILED_VERSION_DOWNGRADE`。
+- **versionCode 单调递增**（1 → 2 → 3 → 4 → …），避免 `INSTALL_FAILED_VERSION_DOWNGRADE`。
 - 覆盖安装三条件：同包名 `com.yinhush.qbtun` + 同签名证书 + versionCode 不降级。
   v1.0.0 与 v1.0.1 用的是同一把钥匙，**可直接覆盖安装，不需要先卸载**。
 - 校验方法：`_local/download.py` 会比对签名证书 DER 是否嵌在 APK Signing Block 里；

@@ -1,14 +1,20 @@
 package com.yinhush.qbtun;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
+import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
+import android.webkit.JsResult;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -74,6 +80,29 @@ public class MainActivity extends Activity {
         cm.setAcceptThirdPartyCookies(web, true);
 
         web.addJavascriptInterface(new Bridge(), "QBAndroid");
+
+        // WebView 默认不显示 JS 对话框：confirm() 会恒返回 false、alert() 静默消失，
+        // 批量按钮都先走 confirmRun()，于是全部「点了没反应」。必须用原生对话框接管。
+        web.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, final JsResult result) {
+                showJsDialog("确认操作", message, true, result);
+                return true;
+            }
+
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, final JsResult result) {
+                showJsDialog("提示", message, false, result);
+                return true;
+            }
+
+            @Override
+            public boolean onConsoleMessage(ConsoleMessage cm) {
+                Log.d("QBWeb", cm.message() + " @" + cm.lineNumber() + " " + cm.sourceId());
+                return true;
+            }
+        });
+
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest req) {
@@ -88,6 +117,40 @@ public class MainActivity extends Activity {
         });
 
         web.loadUrl(site + "/__gui");
+    }
+
+    /** 把 JS 的 alert/confirm 映射成 Android 原生对话框，并必须回调 JsResult 解除 JS 阻塞。 */
+    private void showJsDialog(final String title, final String message,
+                              final boolean cancellable, final JsResult result) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this)
+                        .setTitle(title)
+                        .setMessage(message)
+                        .setPositiveButton(cancellable ? "确定" : "知道了",
+                                new DialogInterface.OnClickListener() {
+                                    @Override public void onClick(DialogInterface d, int w) {
+                                        result.confirm();
+                                    }
+                                });
+                if (cancellable) {
+                    b.setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            result.cancel();
+                        }
+                    });
+                }
+                b.setOnCancelListener(new DialogInterface.OnCancelListener() {
+                    @Override public void onCancel(DialogInterface d) { result.cancel(); }
+                });
+                try {
+                    b.show();
+                } catch (Exception e) {
+                    // Activity 已销毁时别把 JS 线程卡死
+                    result.cancel();
+                }
+            }
+        });
     }
 
     /** 站点默认取 assets/qb_config.json，用户可在「配置」里覆盖。 */

@@ -111,11 +111,24 @@
     }
     try { return JSON.parse(LS.getItem(K_BILL) || '[]') || []; } catch (e) { return []; }
   }
+  /* 2 小时内最多一条日志：最后一行（含无效行）在 2h 内就跳过写入，避免账单爆满 */
+  function lastBillLineTime() {
+    var arr = billLines(), last = '';
+    for (var i = arr.length - 1; i >= 0; i--) {
+      if (arr[i] && arr[i].trim()) { last = arr[i].trim(); break; }
+    }
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(last);
+    if (!m) return 0;
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+  }
   function appendBill(line) {
+    var last = lastBillLineTime();
+    if (last && Date.now() >= last && Date.now() - last < 2 * 3600 * 1000) return false;
     var b = bridge();
     if (b && b.appendBill) { try { b.appendBill(line); } catch (e) {} }
     var arr = billLines(); arr.push(line);
     try { LS.setItem(K_BILL, JSON.stringify(arr.slice(-3000))); } catch (e) {}
+    return true;
   }
   function billLine(stats, source, note) {
     if (!stats) {
