@@ -93,7 +93,17 @@ App 可直连；连到不给 IPv6 的 WiFi（例如校园网、手机热点共�
    Contents API `PUT /contents/README.md` 造初始 commit（此时还没有 workflow 文件，
    不会触发 CI），再按上面步骤推送。
 
-配套脚本在本地 `_local/`（`push.py` / `gh.py` / `poll.py` / `download.py`），
+配套脚本在本地 `_local/`（`push.py` / `gh.py` / `poll.py` / `download.py` / `verify_sign.py`），
 被 `.gitignore` 排除、不入库；`poll.py` 轮询 run，`download.py` 用「先取 302 Location、
-再无 auth 下载」两步取回制品 APK 并校验签名。
+再无 auth 下载」两步取回制品 APK 并校验签名，`verify_sign.py` 判定新旧包能否覆盖安装。
+
+调用顺序（在本目录执行，无需本机 git）：
+
+```bash
+python _local/push.py                    # 推送全部文件，输出完整 SHA；可传自定义 commit message
+python _local/poll.py <完整SHA>          # 等 BUILD_DONE success，拿 RUN_ID
+python _local/download.py <RUN_ID>       # 下载并校验 APK，覆盖项目根 QB囤安卓版.apk
+python _local/verify_sign.py             # 与 _local/QB囤安卓版_1.0.0.apk 比对，判定可覆盖安装
+python _local/push.py "docs: ... [skip ci]"   # 只改文档，不触发构建
+```
 
