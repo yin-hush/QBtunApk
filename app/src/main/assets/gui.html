@@ -25,7 +25,7 @@
          color:var(--ink);font:inherit;font-size:12.5px;cursor:pointer}
   button:hover{border-color:var(--brand)}
   button.on{background:var(--brand);border-color:var(--brand);color:#fff}
-
+  button.io{background:#fbfdfc}
 
   .card{margin:0 16px 10px;background:#fff;border:1px solid var(--line);
         border-radius:10px;padding:10px 13px}
@@ -56,6 +56,43 @@
   .billtable tr:last-child td{border-bottom:0}
   .billtable .empty{text-align:center;color:var(--sub);padding:22px}
 
+  /* Q币账单：全局统计 + 每账号明细 */
+  .qwrap{flex:1;overflow:auto;display:none;flex-direction:column;gap:10px}
+  .qwrap.on{display:flex}
+  .qbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .qbar .addr{font-size:11.5px}
+  .qbar button{padding:4px 11px;font-size:12px;flex-shrink:0}
+  .qsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:9px}
+  .qgroup{display:flex;align-items:stretch;flex-wrap:wrap;border:1px solid var(--line);
+          border-radius:9px;background:#fbfdfc;overflow:hidden}
+  .qgroup .q{flex:1;min-width:0;padding:8px 11px;border-right:1px solid var(--line)}
+  .qgroup .q:last-child{border-right:0}
+  .qgroup .q span{display:block;font-size:11px;color:var(--sub)}
+  .qgroup .q b{display:block;font-size:17px;margin-top:2px;white-space:nowrap}
+  .qgroup .q em{display:block;font-style:normal;font-size:11px;color:var(--sub);margin-top:1px}
+  .qacc{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff;
+        margin-bottom:9px}
+  .qacc .ah{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:8px 11px;
+            background:#fafcfb;border-bottom:1px solid var(--line)}
+  .qacc .ah b{font-size:12.5px}
+  .qacc .ah .qq{font-family:Consolas,monospace;color:var(--sub);font-size:12px}
+  .qacc .ah .mini{margin-left:auto;display:flex;gap:12px;font-size:11.5px;color:var(--sub);flex-wrap:wrap}
+  .qacc .ah .mini i{font-style:normal;color:var(--ink);font-weight:600}
+  .qtable-wrap{overflow-x:auto}
+  .qtable{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+  .qtable th,.qtable td{padding:6px 11px;border-bottom:1px solid var(--line);text-align:right}
+  .qtable th{color:var(--sub);font-weight:600;background:#fff}
+  .qtable th:first-child,.qtable td:first-child{text-align:left;font-family:Consolas,monospace}
+  .qtable th:last-child,.qtable td:last-child{text-align:left;font-family:Consolas,monospace;
+    font-size:11px;color:var(--sub);max-width:190px;overflow:hidden;text-overflow:ellipsis}
+  .qtable tbody tr:hover{background:#f7fbf9}
+  .qtable tr:last-child td{border-bottom:0}
+  .qempty{text-align:center;color:var(--sub);padding:26px;font-size:12.5px}
+  .qacc.none .ah{background:#fcfdfc}
+  .qacc .none-tip{padding:9px 11px;color:var(--sub);font-size:12px;background:#fff}
+  .qacc .tag-none{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;
+    background:#f1efe8;color:var(--sub);font-weight:400}
+
   /* 安卓窄屏适配：其余样式与桌面版一致 */
   @media(max-width:720px){
     header{padding:8px 10px;gap:8px}
@@ -68,13 +105,18 @@
     .tabs button{padding:6px 9px}
     .frames{margin:0 10px 8px}
     .billpanel{margin:0 10px 10px;padding:10px}
+    .billhead{gap:6px}
+    .billhead button{padding:4px 8px;font-size:11.5px}
+    .qsum{grid-template-columns:1fr}
+    .qgroup .q{min-width:88px}
+    .qbar .addr{font-size:11px}
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.4</span>
+  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.5</span>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
@@ -110,16 +152,28 @@
 
 <div class="billpanel" id="billPanel" style="display:none">
   <div class="billhead">
-    <h2>额度账单（有效数据）</h2>
+    <h2 id="billTitle">额度账单（有效数据）</h2>
     <button id="billCompact" class="on">精简展示</button>
     <button id="billAll">全部展示</button>
-    <span class="addr">quota_log.txt（App 私有文件）· 精简 = 每天最后一条 + 总额度变动点</span>
+    <button id="billQ">Q币账单</button>
+    <button id="billImport" class="io">导入</button>
+    <button id="billExport" class="io">导出</button>
+    <span class="addr" id="billNote">quota_log.txt · 精简 = 每天最后一条 + 总额度变动点</span>
   </div>
-  <div class="billtable-wrap">
+  <div class="billtable-wrap" id="billTableWrap">
     <table class="billtable">
       <thead><tr><th>时间</th><th>剩余总额度</th><th>已分配</th><th>未分配</th><th>已用额度</th><th>历史总额度</th></tr></thead>
       <tbody id="billBody"><tr><td colspan="6" class="empty">读取中…</td></tr></tbody>
     </table>
+  </div>
+  <div class="qwrap" id="qWrap">
+    <div class="qbar">
+      <button id="qRefresh" class="on">立即采集</button>
+      <span class="addr" id="qCollectInfo"></span>
+      <span class="addr" id="qMeta">qb.log · 按账号分类累积，无记录记 null；网站仅留近 7 天</span>
+    </div>
+    <div class="qsum" id="qSum"></div>
+    <div id="qAccounts"></div>
   </div>
 </div>
 
@@ -128,20 +182,28 @@
 const $ = s => document.querySelector(s);
 let originLoaded = false;
 
-// 0.0.2+：额度账单（有效数据），全部 / 精简两种展示
+// 额度账单 / Q币账单：精简 | 全部 | q 三种展示
 let BILL_MODE = 'compact';
 let BILL_DATA = {all:[], compact:[]};
+let Q_DATA = null;
 
 function escHtml(s){
   return String(s == null ? '' : s).replace(/[&<>"]/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 function fmtNum(v){ return (v === undefined || v === null || v === '') ? '—' : String(v); }
-async function loadBill(){
-  try {
-    BILL_DATA = await QB.bill();
-    renderBill();
-  } catch(e){
+function fmt(v, n){
+  const s = Number(v || 0).toFixed(n === undefined ? 3 : n);
+  return s.indexOf('.') >= 0 ? s.replace(/0+$/, '').replace(/\.$/, '') : s;
+}
+function card(label, val, sub){
+  return '<div class="q"><span>' + label + '</span><b>' + escHtml(val) + '</b>'
+    + (sub ? '<em>' + escHtml(sub) + '</em>' : '') + '</div>';
+}
+
+function loadBill(){
+  try { BILL_DATA = QB.bill(); renderBill(); }
+  catch(e){
     $('#billBody').innerHTML = '<tr><td colspan="6" class="empty">账单读取失败：' + escHtml(e.message) + '</td></tr>';
   }
 }
@@ -158,11 +220,97 @@ function renderBill(){
     + '<td>' + fmtNum(r.historical) + '</td>'
     + '</tr>').join('');
 }
-$('#billCompact').onclick = () => {
-  BILL_MODE = 'compact'; $('#billCompact').className = 'on'; $('#billAll').className = ''; renderBill();
-};
-$('#billAll').onclick = () => {
-  BILL_MODE = 'all'; $('#billAll').className = 'on'; $('#billCompact').className = ''; renderBill();
+
+// ───────── Q币账单 ─────────
+function renderQ(){
+  if (!Q_DATA){ $('#qAccounts').innerHTML = '<div class="qempty">读取中…</div>'; return; }
+  const t = Q_DATA.total || {}, c = Q_DATA.collect || {};
+  $('#qCollectInfo').textContent = c.error ? c.error : (c.at
+    ? ('最近采集 ' + c.at + ' · 本次新增 ' + c.added + ' 条 · 累计 ' + c.total + ' 条')
+    : '尚未采集');
+  $('#qSum').innerHTML =
+      '<div class="qgroup">'
+    + card('账号总数', t.accountCount, t.noRecordCount + ' 个无记录')
+    + card('充值笔数', t.recordCount) + '</div>'
+    + '<div class="qgroup">'
+    + card('Q币总和', fmt(t.amount)) + card('能量总和', fmt(t.cost))
+    + card('总折扣', fmt(t.discount, 4), fmt(t.zhe, 2) + ' 折') + '</div>';
+  const groups = Q_DATA.accounts || [];
+  if (!groups.length){
+    $('#qAccounts').innerHTML = '<div class="qempty">qb.log 里还没有任何账号，点「立即采集」抓取一次，或用「导入」恢复备份。</div>';
+    return;
+  }
+  $('#qAccounts').innerHTML = groups.map(g => {
+    const label = (g.note ? escHtml(g.note) + ' · ' : '') + escHtml(g.qq);
+    if (!g.hasRecords){
+      return '<div class="qacc none"><div class="ah"><b>' + label + '</b>'
+        + '<span class="qq">id ' + escHtml(g.id) + '</span>'
+        + '<span class="mini"><span class="tag-none">无记录</span></span></div>'
+        + '<div class="none-tip">该账号暂无任何充值记录（qb.log 中记为 null）</div></div>';
+    }
+    const mini = '<span>笔数 <i>' + g.count + '</i></span>'
+      + '<span>Q币 <i>' + fmt(g.amount) + '</i></span>'
+      + '<span>能量 <i>' + fmt(g.cost) + '</i></span>'
+      + '<span>折扣 <i>' + fmt(g.discount, 4) + '</i>（' + fmt(g.zhe, 2) + ' 折）</span>';
+    const rows = (g.records || []).map(r => '<tr>'
+      + '<td>' + escHtml(r.paidAt || '—') + '</td>'
+      + '<td>' + fmt(r.amount) + '</td>'
+      + '<td>' + fmt(r.cost) + '</td>'
+      + '<td>' + fmt(r.amount ? r.cost / r.amount : 0, 4) + '</td>'
+      + '<td title="' + escHtml(r.serial) + '">' + escHtml(r.serial || '—') + '</td>'
+      + '</tr>').join('');
+    return '<div class="qacc"><div class="ah"><b>' + label + '</b>'
+      + '<span class="qq">id ' + escHtml(g.id) + '</span>'
+      + '<span class="mini">' + mini + '</span></div>'
+      + '<div class="qtable-wrap"><table class="qtable"><thead><tr><th>充值时间</th><th>Q币</th><th>能量</th>'
+      + '<th>折扣</th><th>流水号</th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  }).join('');
+}
+
+async function loadQ(collect){
+  const btn = $('#qRefresh');
+  if (collect){ btn.disabled = true; btn.textContent = '采集中…'; }
+  try {
+    Q_DATA = collect ? await QB.qcollect() : QB.qbill();
+    if (BILL_MODE === 'q') renderQ();
+  } catch(e){
+    if (BILL_MODE === 'q') $('#qAccounts').innerHTML =
+      '<div class="qempty">Q币账单读取失败：' + escHtml(e.message) + '</div>';
+  } finally {
+    if (collect){ btn.disabled = false; btn.textContent = '立即采集'; }
+  }
+}
+
+function currentKind(){ return BILL_MODE === 'q' ? 'qb' : 'quota'; }
+
+function setBillMode(mode){
+  BILL_MODE = mode;
+  $('#billCompact').className = mode === 'compact' ? 'on' : '';
+  $('#billAll').className     = mode === 'all'     ? 'on' : '';
+  $('#billQ').className       = mode === 'q'       ? 'on' : '';
+  const isQ = mode === 'q';
+  $('#billTableWrap').style.display = isQ ? 'none' : '';
+  $('#qWrap').className = isQ ? 'qwrap on' : 'qwrap';
+  $('#billTitle').textContent = isQ ? 'Q币账单（本地累积）' : '额度账单（有效数据）';
+  $('#billNote').textContent = isQ
+    ? 'qb.log · 按账号分类累积，导入为合并去重（不覆盖）'
+    : 'quota_log.txt · 精简 = 每天最后一条 + 总额度变动点';
+  if (isQ) loadQ(false); else renderBill();
+}
+$('#billCompact').onclick = () => setBillMode('compact');
+$('#billAll').onclick     = () => setBillMode('all');
+$('#billQ').onclick       = () => setBillMode('q');
+$('#qRefresh').onclick    = () => loadQ(true);
+
+// 导入 / 导出：作用于当前视图对应的账单文件
+$('#billImport').onclick = () => { QB.importPick(currentKind()); };
+$('#billExport').onclick = () => { QB.exportBill(currentKind()); };
+
+// SAF 导入完成后的回调（app.js 通过 QB.onImportDone 触发）
+QB.onImportDone = function(res){
+  if (res.error){ QB.toast('导入失败：' + res.error); return; }
+  if (BILL_MODE === 'q') loadQ(false); else loadBill();
+  QB.toast('导入完成：新增 ' + res.added + ' 条，共 ' + res.total + ' 条（已去重合并）');
 };
 
 async function refresh(){
@@ -180,7 +328,7 @@ async function refresh(){
     $('#cfgProxy').value = s.config.proxy || '';
     $('#cfgSite').value = s.config.site || s.upstream || '';
     $('#cfgCk').placeholder = s.config.hasCookie ? ('当前：' + s.config.cookiePreview) : '（无 CK）';
-    await loadBill();
+    if (BILL_MODE === 'q') await loadQ(false); else loadBill();
   } catch(e){
     $('#badge').textContent = '状态读取失败：' + e.message;
   }
@@ -196,7 +344,7 @@ function tab(which){
   $('#frameTool').style.display   = which === 'tool'   ? 'block' : 'none';
   $('#frameOrigin').style.display = which === 'origin' ? 'block' : 'none';
   if (which === 'origin' && !originLoaded){ $('#frameOrigin').src = '/'; originLoaded = true; }
-  if (bill) loadBill();
+  if (bill){ if (BILL_MODE === 'q') loadQ(false); else loadBill(); }
 }
 
 $('#tabTool').onclick   = () => tab('tool');

@@ -6,6 +6,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
@@ -31,6 +32,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,17 +47,31 @@ import java.util.Map;
  * 自动携带，不需要 CORS、不需要跨域凭证、也不需要应用内代理。
  *
  * 账号密码/CK 不写进代码，由使用者在页面「配置」里填写，存于 localStorage +
- * WebView CookieManager；账单写到 App 私有目录 quota_log.txt。
+ * WebView CookieManager；账单写到 App 私有目录：
+ *   quota_log.txt  额度账单（纯文本行）
+ *   qb.log         Q币账单（JSON Lines，按账号分类累积充值记录）
+ * 两个账单都支持导入/导出：用 SAF(ACTION_CREATE_DOCUMENT / ACTION_OPEN_DOCUMENT)
+ * 让用户自己选文件位置，不需要申请存储权限，也无需读写外部存储。
  */
 public class MainActivity extends Activity {
 
     private static final String PREFS = "qbtun";
     private static final String KEY_SITE = "site";
     private static final String BILL_FILE = "quota_log.txt";
+    private static final String QB_FILE = "qb.log";
     private static final String DEFAULT_SITE = "https://tj.2.wffwff.cn:6789";
+
+    private static final int REQ_EXPORT = 1001;
+    private static final int REQ_IMPORT = 1002;
+    private static final int MAX_IMPORT_BYTES = 8 * 1024 * 1024;  // 导入文件上限，避免 OOM
 
     private WebView web;
     private volatile String site;
+
+    // SAF 导入导出的待处理数据（startActivityForResult 期间暂存）
+    private String pendingExportName;
+    private String pendingExportText;
+    private String pendingImportKind;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -250,12 +266,178 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
+    /** 导入额度账单用：原样追加多行，不做 2h 限流（限流在 JS 的常规写入路径上）。 */
+    private synchronized void appendBillRaw(String text) {
+        if (text == null || text.isEmpty()) return;
+        try {
+            FileOutputStream out = new FileOutputStream(billFile(), true);
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.close();
+        } catch (Exception ignored) {}
+    }
+
+    private File qbFile() { return new File(getFilesDir(), QB_FILE); }
+
+    private synchronized String readQb() {
+        StringBuilder sb = new StringBuilder();
+        try {
+            BufferedReader r = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(qbFile()), StandardCharsets.UTF_8));
+            String line;
+            while ((line = r.readLine()) != null) sb.append(line).append('\n');
+            r.close();
+        } catch (Exception ignored) {}
+        return sb.toString();
+    }
+
+    /** 追加 JSON Lines（采集与导入合并都走这里）。 */
+    private synchronized void appendQb(String text) {
+        if (text == null || text.isEmpty()) return;
+        try {
+            FileOutputStream out = new FileOutputStream(qbFile(), true);
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.close();
+        } catch (Exception ignored) {}
+    }
+
+    // ─────────────── SAF 导入 / 导出 ───────────────
+
+    /** 导出：调系统「另存为」，用户选位置后写入账单原文。 */
+    private void startExport(final String name, final String text) {
+        pendingExportName = name;
+        pendingExportText = text;
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("text/plain");
+                    i.putExtra(Intent.EXTRA_TITLE, name);
+                    startActivityForResult(i, REQ_EXPORT);
+                } catch (Exception e) {
+                    toast("无法打开保存界面：" + e.getMessage());
+                }
+            }
+        });
+    }
+
+    /** 导入：调系统文件选择器，读回文本后回调 JS 的 QB.onImportResult(kind, text)。 */
+    private void startImport(final String kind) {
+        pendingImportKind = kind;
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    startActivityForResult(i, REQ_IMPORT);
+                } catch (Exception e) {
+                    toast("无法打开文件选择器：" + e.getMessage());
+                }
+            }
+        });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            toast("已取消");
+            return;
+        }
+        Uri uri = data.getData();
+        if (requestCode == REQ_EXPORT) {
+            writeToUri(uri, pendingExportText);
+            pendingExportText = null;
+        } else if (requestCode == REQ_IMPORT) {
+            String text = readFromUri(uri);
+            final String kind = pendingImportKind == null ? "qb" : pendingImportKind;
+            pendingImportKind = null;
+            if (text == null) {
+                toast("读取文件失败或文件过大（上限 8MB）");
+                return;
+            }
+            deliverImport(kind, text);
+        }
+    }
+
+    private void writeToUri(Uri uri, String text) {
+        if (text == null) text = "";
+        try {
+            OutputStream out = getContentResolver().openOutputStream(uri);
+            if (out == null) throw new Exception("openOutputStream returned null");
+            out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.flush();
+            out.close();
+            toast("已导出 " + pendingExportName);
+        } catch (Exception e) {
+            toast("导出失败：" + e.getMessage());
+        }
+    }
+
+    private String readFromUri(Uri uri) {
+        try {
+            InputStream in = getContentResolver().openInputStream(uri);
+            if (in == null) return null;
+            java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+            byte[] tmp = new byte[8192];
+            int n;
+            while ((n = in.read(tmp)) != -1) {
+                if (buf.size() + n > MAX_IMPORT_BYTES) { in.close(); return null; }
+                buf.write(tmp, 0, n);
+            }
+            in.close();
+            return new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 用 evaluateJavascript 把导入文本回传页面；JSONObject.quote 负责转义。 */
+    private void deliverImport(final String kind, final String text) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    String js = "window.QB&&QB.onImportResult&&QB.onImportResult("
+                            + JSONObject.quote(kind) + "," + JSONObject.quote(text) + ")";
+                    web.evaluateJavascript(js, null);
+                } catch (Exception e) {
+                    toast("导入回传失败：" + e.getMessage());
+                }
+            }
+        });
+    }
+
+    private void toast(final String msg) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                Toast.makeText(MainActivity.this, msg, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
     private class Bridge {
         @JavascriptInterface
         public String readBill() { return MainActivity.this.readBill(); }
 
         @JavascriptInterface
         public void appendBill(String line) { MainActivity.this.appendBill(line); }
+
+        @JavascriptInterface
+        public void appendBillRaw(String text) { MainActivity.this.appendBillRaw(text); }
+
+        @JavascriptInterface
+        public String readQb() { return MainActivity.this.readQb(); }
+
+        @JavascriptInterface
+        public void appendQb(String text) { MainActivity.this.appendQb(text); }
+
+        /** kind = "qb" | "quota"，仅用于导入时区分目标账单 */
+        @JavascriptInterface
+        public void exportText(String name, String content) { MainActivity.this.startExport(name, content); }
+
+        @JavascriptInterface
+        public void importText(String kind) { MainActivity.this.startImport(kind); }
 
         @JavascriptInterface
         public String getSite() { return site; }
