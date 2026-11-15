@@ -116,7 +116,7 @@
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.5</span>
+  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.6</span>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
@@ -155,6 +155,7 @@
     <h2 id="billTitle">额度账单（有效数据）</h2>
     <button id="billCompact" class="on">精简展示</button>
     <button id="billAll">全部展示</button>
+    <button id="billDaily">按日精简</button>
     <button id="billQ">Q币账单</button>
     <button id="billImport" class="io">导入</button>
     <button id="billExport" class="io">导出</button>
@@ -182,9 +183,9 @@
 const $ = s => document.querySelector(s);
 let originLoaded = false;
 
-// 额度账单 / Q币账单：精简 | 全部 | q 三种展示
+// 额度账单 / Q币账单：精简 | 全部 | 按日精简 | q 四种展示
 let BILL_MODE = 'compact';
-let BILL_DATA = {all:[], compact:[]};
+let BILL_DATA = {all:[], compact:[], daily:[]};
 let Q_DATA = null;
 
 function escHtml(s){
@@ -283,22 +284,28 @@ async function loadQ(collect){
 
 function currentKind(){ return BILL_MODE === 'q' ? 'qb' : 'quota'; }
 
+const BILL_NOTES = {
+  compact: 'quota_log.txt · 精简 = 每天最后一条 + 总额度变动点',
+  all:     'quota_log.txt · 全部有效记录',
+  daily:   '按日精简：历史每日只留最新；连续≥3天剩余总额度不变只留首尾；今天不清理',
+  q:       'qb.log · 按账号分类累积，导入为合并去重（不覆盖）'
+};
 function setBillMode(mode){
   BILL_MODE = mode;
   $('#billCompact').className = mode === 'compact' ? 'on' : '';
   $('#billAll').className     = mode === 'all'     ? 'on' : '';
+  $('#billDaily').className   = mode === 'daily'   ? 'on' : '';
   $('#billQ').className       = mode === 'q'       ? 'on' : '';
   const isQ = mode === 'q';
   $('#billTableWrap').style.display = isQ ? 'none' : '';
   $('#qWrap').className = isQ ? 'qwrap on' : 'qwrap';
   $('#billTitle').textContent = isQ ? 'Q币账单（本地累积）' : '额度账单（有效数据）';
-  $('#billNote').textContent = isQ
-    ? 'qb.log · 按账号分类累积，导入为合并去重（不覆盖）'
-    : 'quota_log.txt · 精简 = 每天最后一条 + 总额度变动点';
+  $('#billNote').textContent = BILL_NOTES[mode] || '';
   if (isQ) loadQ(false); else renderBill();
 }
 $('#billCompact').onclick = () => setBillMode('compact');
 $('#billAll').onclick     = () => setBillMode('all');
+$('#billDaily').onclick   = () => setBillMode('daily');
 $('#billQ').onclick       = () => setBillMode('q');
 $('#qRefresh').onclick    = () => loadQ(true);
 

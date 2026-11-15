@@ -181,7 +181,41 @@
       prev = r.historical;
     });
     var idx = Object.keys(keep).map(Number).sort(function (a, b) { return a - b; });
-    return { all: rows, compact: idx.map(function (i) { return rows[i]; }), lines: billLines() };
+    return {
+      all: rows,
+      compact: idx.map(function (i) { return rows[i]; }),
+      daily: dailyCompact(rows),
+      lines: billLines()
+    };
+  }
+
+  /* 按日精简（与桌面版 server.py:daily_compact_bill 同构）：
+       1. 历史每一天只留当日最新一条；当天全部保留、不参与压缩（当天数据仍在变化）。
+       2. 历史「每日一条」序列中，剩余总额度连续 >=3 天不变的段只留首、尾两条
+          （1,2,3,4,5 天都不变 → 只留第 1 天和第 5 天）。
+       3. 结果按时间升序。 */
+  function dailyCompact(rows) {
+    if (!rows || !rows.length) return [];
+    var d = new Date();
+    var today = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    var byDay = {}, todayRows = [];
+    rows.forEach(function (r) {
+      if (r.date === today) { todayRows.push(r); return; }
+      var prev = byDay[r.date];
+      if (!prev || (r.ts || '') > (prev.ts || '')) byDay[r.date] = r;
+    });
+    var daily = Object.keys(byDay).sort().map(function (k) { return byDay[k]; });
+    var kept = [], i = 0, n = daily.length;
+    while (i < n) {
+      var j = i;
+      while (j + 1 < n && r3(daily[j + 1].total) === r3(daily[i].total)) j++;
+      if (j - i + 1 >= 3) { kept.push(daily[i]); kept.push(daily[j]); }
+      else { for (var k = i; k <= j; k++) kept.push(daily[k]); }
+      i = j + 1;
+    }
+    var out = kept.concat(todayRows);
+    out.sort(function (a, b) { return (a.ts || '').localeCompare(b.ts || ''); });
+    return out;
   }
 
   /* ───────────── Q币账单 qb.log ─────────────
