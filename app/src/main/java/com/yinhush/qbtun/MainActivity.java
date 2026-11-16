@@ -300,6 +300,15 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {}
     }
 
+    /** 整体重写 qb.log（昵称同步用：只改 note/id 字段，充值记录本身只增不删）。 */
+    private synchronized void writeQb(String text) {
+        try {
+            FileOutputStream out = new FileOutputStream(qbFile(), false);
+            if (text != null && !text.isEmpty()) out.write(text.getBytes(StandardCharsets.UTF_8));
+            out.close();
+        } catch (Exception ignored) {}
+    }
+
     // ─────────────── SAF 导入 / 导出 ───────────────
 
     /** 导出：调系统「另存为」，用户选位置后写入账单原文。 */
@@ -431,6 +440,9 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public void appendQb(String text) { MainActivity.this.appendQb(text); }
+
+        @JavascriptInterface
+        public void writeQb(String text) { MainActivity.this.writeQb(text); }
 
         /** kind = "qb" | "quota"，仅用于导入时区分目标账单 */
         @JavascriptInterface

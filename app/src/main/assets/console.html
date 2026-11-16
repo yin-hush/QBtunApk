@@ -50,11 +50,13 @@
   textarea{width:100%;min-height:96px;padding:9px;border:1px solid var(--line);border-radius:8px;
            font:12px/1.5 Consolas,monospace;resize:vertical}
   .foot{margin-top:8px;font-size:12px;color:var(--sub)}
-  .qstats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .qstats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .q{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fbfdfc}
   .q span{display:block;font-size:11.5px;color:var(--sub)}
   .q b{display:block;font-size:19px;margin-top:2px}
-  @media(max-width:720px){.qstats{grid-template-columns:repeat(2,1fr)}}
+  .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
+  .q .qsub em{font-style:normal;font-weight:600;color:var(--ink);font-size:12.5px}
+  @media(max-width:720px){.qstats{grid-template-columns:1fr 1fr}}
 
   @media(max-width:720px){
     body{padding:10px}
@@ -80,10 +82,12 @@
   <div class="card" id="quotaCard">
     <h2>额度统计</h2>
     <div class="qstats">
-      <div class="q"><span>剩余总额度</span><b id="qTotal">—</b></div>
-      <div class="q"><span>已分配</span><b id="qAlloc">—</b></div>
-      <div class="q"><span>未分配</span><b id="qFree">—</b></div>
-      <div class="q"><span>已用额度（所有账号合计）</span><b id="qUsed">—</b></div>
+      <div class="q"><span>剩余总额度</span><b id="qTotal">—</b>
+        <i class="qsub">已分配 <em id="qAlloc">—</em> · 未分配 <em id="qFree">—</em></i></div>
+      <div class="q"><span>历史总额度</span><b id="qHist">—</b>
+        <i class="qsub">已用额度（所有账号合计）<em id="qUsed">—</em></i></div>
+      <div class="q"><span>Q币总和</span><b id="qQb">—</b>
+        <i class="qsub">总折扣 <em id="qZhe">—</em></i></div>
     </div>
     <div class="foot" id="qMeta" style="margin-top:7px">额度账单：quota_log.txt（每次启动记录）</div>
   </div>
@@ -108,23 +112,23 @@
 
   <div class="grid">
     <div class="card">
-      <h2>2 · 改额度（对选中账号）</h2>
-      <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
-      <div style="height:10px"></div>
-      <button class="primary" id="btnQuota">批量改额度</button>
-      <div class="foot">接口：/qb/accounts/quota，body {id, quota}</div>
+      <h2>2 · 改额度 / 改档位（对选中账号）</h2>
+      <div class="grid">
+        <div>
+          <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
+          <div style="height:10px"></div>
+          <button class="primary" id="btnQuota">批量改额度</button>
+        </div>
+        <div>
+          <label>目标档位 tier</label><select id="tierVal"></select>
+          <div style="height:10px"></div>
+          <button class="primary" id="btnTier">批量换档位</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
-      <h2>3 · 改档位（对选中账号）</h2>
-      <label>目标档位 tier</label><select id="tierVal"></select>
-      <div style="height:10px"></div>
-      <button class="primary" id="btnTier">批量换档位</button>
-      <div class="foot">接口：/qb/accounts/switch-tier，较慢，串行执行</div>
-    </div>
-
-    <div class="card">
-      <h2>4 · 改模式 / 改昵称</h2>
+      <h2>3 · 改模式 / 改昵称</h2>
       <label>模式</label><select id="modeVal"></select>
       <div style="height:8px"></div>
       <button class="primary" id="btnMode">批量改模式</button>
@@ -136,7 +140,7 @@
   </div>
 
   <div class="card">
-    <h2>5 · 批量发卡</h2>
+    <h2>4 · 批量发卡</h2>
     <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
     <div style="height:8px"></div>
     <div class="row">
@@ -188,10 +192,19 @@ async function loadQuota(){
     const q = s.stats;
     if (q){
       document.getElementById('qTotal').textContent = q.total;
+      document.getElementById('qHist').textContent  = q.historical;
       document.getElementById('qAlloc').textContent = q.allocated;
       document.getElementById('qFree').textContent  = q.free;
       document.getElementById('qUsed').textContent  = q.used;
     }
+    // Q币总和 / 总折扣 来自 Q币账单（qb.log）统计
+    try {
+      const t = (QB.qbill && QB.qbill() || {}).total;
+      if (t && t.recordCount > 0){
+        document.getElementById('qQb').textContent  = t.amount;
+        document.getElementById('qZhe').textContent = t.zhe ? (t.zhe + ' 折') : '—';
+      }
+    } catch(e){}
     meta.textContent = '账号数 ' + (q ? q.accounts : '—')
       + ' · 统计时间 ' + (s.statsAt || '—')
       + ' · 额度账单：quota_log.txt（App 私有文件）';
@@ -263,18 +276,22 @@ async function loadMeta(){
     const m = await api.meta();
     const tiers = m.tiers || [];
     const modes = m.modes || [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}];
-    const fill = (sel, list, valKey, labelKey, fallback) => {
+    const fill = (sel, list, valKey, labelKey, fallback, suffix) => {
       const el = $(sel), old = el.value;
       el.innerHTML = '';
       (list.length ? list : fallback).forEach(x => {
         const o = document.createElement('option');
-        o.value = String(x[valKey]); o.textContent = String(x[labelKey] || x[valKey]);
+        const extra = suffix ? (suffix(x) || '') : '';
+        o.value = String(x[valKey]);
+        o.textContent = String(x[labelKey] || x[valKey]) + (extra ? '（' + extra + '）' : '');
         el.appendChild(o);
       });
       if (old) el.value = old;
     };
-    fill('#cardTier', tiers, 'key', 'label', [{key:'1',label:'1起'}]);
-    fill('#tierVal',  tiers, 'key', 'label', [{key:'1',label:'1起'}]);
+    // 档位折扣每天会变，从 /qb/meta 的 rates 里动态读取（text 是上游算好的最终折扣文本）
+    const rateOf = k => (m.rates && m.rates[String(k)] && m.rates[String(k)].text) || '';
+    fill('#cardTier', tiers, 'key', 'label', [{key:'1',label:'1起'}], x => rateOf(x.key));
+    fill('#tierVal',  tiers, 'key', 'label', [{key:'1',label:'1起'}], x => rateOf(x.key));
     fill('#cardMode', modes, 'value', 'label', [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}]);
     fill('#modeVal',  modes, 'value', 'label', [{value:'auto',label:'本期充满'},{value:'loop',label:'循环充值'}]);
     log('已加载档位 ' + tiers.length + ' 个、模式 ' + modes.length + ' 个');

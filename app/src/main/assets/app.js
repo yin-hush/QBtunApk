@@ -262,6 +262,13 @@
     recs.forEach(function (r) { arr.push(JSON.stringify(r)); });
     try { LS.setItem(K_QB, JSON.stringify(arr.slice(-20000))); } catch (e) {}
   }
+  /** 整体重写 qb.log（昵称同步用：只改 note/id，不动充值记录）。 */
+  function writeQbAll(all) {
+    var text = all.map(function (r) { return JSON.stringify(r); }).join('\n') + '\n';
+    var b = bridge();
+    if (b && b.writeQb) { try { b.writeQb(text); } catch (e) {} }
+    try { LS.setItem(K_QB, JSON.stringify(all.slice(-20000).map(function (r) { return JSON.stringify(r); }))); } catch (e) {}
+  }
   function collectQb(j) {
     var rows = qbRows(), seen = {}, knownQq = {}, detailBefore = 0;
     rows.forEach(function (r) {
@@ -296,11 +303,25 @@
       }
     });
     appendQb(added);
+    // 昵称同步：按账号（qq 主键）比对上游最新 note/id，历史行就地更新，充值记录只增不删
+    var latest = {};
+    (j.items || []).forEach(function (it) {
+      var qq = String(it.qq || '').trim();
+      if (qq) latest[qq] = { note: String(it.note || '').trim(), id: it.id };
+    });
+    var noteSync = 0;
+    rows.forEach(function (r) {
+      var cur = latest[String(r.qq || '').trim()];
+      if (cur && (String(r.note || '') !== cur.note || r.id !== cur.id)) {
+        r.note = cur.note; r.id = cur.id; noteSync++;
+      }
+    });
+    if (noteSync) writeQbAll(rows.concat(added));
     var newDetails = added.filter(function (r) { return !isPh(r); }).length;
     var total = detailBefore + newDetails;
     S.qbCollect = {
       at: ts, added: newDetails, total: total,
-      accounts: Object.keys(knownQq).length, error: ''
+      accounts: Object.keys(knownQq).length, noteSync: noteSync, error: ''
     };
     return newDetails;
   }
