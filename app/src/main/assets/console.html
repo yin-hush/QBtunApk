@@ -54,6 +54,15 @@
   .q b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);margin-top:3px;white-space:nowrap}
   .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
   .q .qsub em{font-style:normal;font-weight:400;color:var(--ink);font-size:12.5px}
+  .lsub{font-style:normal;font-weight:400;font-size:8px;color:var(--sub);margin-left:2px}
+  /* 第一、二卡统一用表格式 grid：标签/数值同列居中，分隔符独占一列且非黑体 */
+  .q.q1 .g1,.q.q2 .g2{display:grid;row-gap:3px;align-items:center;width:max-content}
+  .q.q1 .g1{grid-template-columns:max-content 12px max-content}
+  .q.q2 .g2{grid-template-columns:max-content 12px max-content 12px max-content 12px max-content}
+  .q .g1 .lab,.q .g2 .lab{font-size:11.5px;color:var(--sub);text-align:center;white-space:nowrap}
+  .q .g1 .val,.q .g2 .val{font-size:14.5px;font-weight:700;color:var(--ink);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .q .g1 .op,.q .g2 .op{color:var(--sub);font-size:13px;text-align:center;font-weight:400}
+  .q.q2 .g2 > :nth-child(7),.q.q2 .g2 > :nth-child(14){text-align:left}
   @media(max-width:720px){.qstats{grid-template-columns:1fr}}
 
   @media(max-width:720px){
@@ -78,12 +87,16 @@
   <div class="card" id="quotaCard">
     <h2>额度统计</h2>
     <div class="qstats">
-      <div class="q"><span>剩余额度 / 历史总</span>
-        <b><span id="qTotal">—</span> / <span id="qHist">—</span></b>
+      <div class="q q1"><div class="g1">
+        <span class="lab">剩余额度</span><span class="op">/</span><span class="lab">历史总</span>
+        <b class="val" id="qTotal">—</b><span class="op">/</span><b class="val" id="qHist">—</b>
+      </div>
         <i class="qsub">已分配 / 未分配 / 已用</i>
         <i class="qsub"><em id="qAlloc">—</em> / <em id="qFree">—</em> / <em id="qUsed">—</em></i></div>
-      <div class="q"><span>Q币总和 / 今日充 / 还能充</span>
-        <b><span id="qQb">—</span> / <span id="qToday">—</span> / <span id="qLeft">—</span></b>
+      <div class="q q2"><div class="g2">
+        <span class="lab">Q币总和</span><span class="op">/</span><span class="lab">今日</span><span class="op">-</span><span class="lab">已充</span><span class="op">/</span><span class="lab">还能充<i class="lsub">（七日内）</i></span>
+        <b class="val" id="qQb">—</b><span class="op">/</span><b class="val" id="qToday">0</b><span class="op">-</span><b class="val" id="qCharged">—</b><span class="op">/</span><b class="val" id="qLeft">—</b>
+      </div>
         <i class="qsub">总折扣 / 今日折扣</i>
         <i class="qsub"><em id="qZhe">—</em> / <em id="qZheToday">—</em></i></div>
     </div>
@@ -96,8 +109,8 @@
     <h2>1 · 今日到账</h2>
     <div class="tbl-wrap" style="max-height:220px">
       <table>
-        <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th><th>折扣</th></tr></thead>
-        <tbody id="todayBody"><tr><td colspan="6" class="hint">无</td></tr></tbody>
+        <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th></tr></thead>
+        <tbody id="todayBody"><tr><td colspan="5" class="hint">无</td></tr></tbody>
       </table>
     </div>
     <div class="foot" id="todayMeta" style="margin-top:7px"></div>
@@ -113,8 +126,8 @@
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th></th><th>id</th><th>QQ</th><th>昵称</th><th>档位</th><th>模式</th><th>额度</th><th>已用</th><th>状态</th></tr></thead>
-        <tbody id="tbody"><tr><td colspan="9" class="hint">点「刷新列表」加载</td></tr></tbody>
+        <thead><tr><th></th><th>id</th><th>QQ</th><th>昵称</th><th>档位</th><th>已充<i class="lsub">（七日内）</i></th><th>模式</th><th>额度</th><th>已用</th><th>状态</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="10" class="hint">点「刷新列表」加载</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -212,18 +225,37 @@ function collectToday(b){
   rows.sort((x, y) => (x.paidAt < y.paidAt ? -1 : x.paidAt > y.paidAt ? 1 : 0));
   return rows;
 }
+// 七日已充：qq → 「60币·3笔」（paidAt 在今天往前 7 天内，含今天）
+let QB7 = null;
+function loadQb7(){
+  try {
+    const b = (QB.qbill && QB.qbill()) || {};
+    const p = n => String(n).padStart(2, '0');
+    const cut = new Date(); cut.setDate(cut.getDate() - 6);
+    const cutStr = cut.getFullYear() + '-' + p(cut.getMonth()+1) + '-' + p(cut.getDate());
+    const endStr = todayStr(), m = {};
+    ((b && b.accounts) || []).forEach(a => {
+      let amt = 0, n = 0;
+      (a.records || []).forEach(r => {
+        const d = String(r.paidAt || '').slice(0, 10);
+        if (d >= cutStr && d <= endStr){ amt += Number(r.amount) || 0; n++; }
+      });
+      if (n) m[String(a.qq || '')] = r3(amt) + '币·' + n + '笔';
+    });
+    QB7 = m;
+  } catch(e){ QB7 = null; }
+}
 function renderToday(rows){
   const body = document.getElementById('todayBody');
   const meta = document.getElementById('todayMeta');
   if (!rows.length){
-    body.innerHTML = '<tr><td colspan="6" class="hint">无</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="hint">无</td></tr>';
     meta.textContent = '今日（' + todayStr() + '）暂无充值到账';
     return;
   }
   body.innerHTML = rows.map(r =>
     '<tr><td>' + r.paidAt + '</td><td>' + r.note + '</td><td>' + r.qq + '</td>'
-    + '<td>' + r.amount + '</td><td>' + r.cost + '</td>'
-    + '<td>' + (r.amount ? ((r.cost / r.amount * 10).toFixed(2) + ' 折') : '—') + '</td></tr>'
+    + '<td>' + r.amount + '</td><td>' + r.cost + '</td></tr>'
   ).join('');
   meta.textContent = '今日（' + todayStr() + '）共 ' + rows.length + ' 笔';
 }
@@ -250,16 +282,18 @@ async function loadQuota(){
       const today = collectToday(b);
       let amt = 0, cost = 0;
       today.forEach(r => { amt += r.amount; cost += r.cost; });
-      document.getElementById('qToday').textContent    = today.length ? String(r3(amt)) : '—';
+      document.getElementById('qToday').textContent    = String(r3(amt)); // 今日无到账写 0
       document.getElementById('qZheToday').textContent = amt ? ((cost / amt * 10).toFixed(2) + ' 折') : '—';
       renderToday(today);
     } catch(e){}
-    // 还能充（合计）：原网页汇总表的 overview.total.left，服务端算好直接取
+    // 还能充 / 已充（合计）：原网页汇总表的 overview.total，服务端算好直接取
     try {
       const a = await api.accounts();
       const t = a && a.overview && a.overview.total;
       document.getElementById('qLeft').textContent =
         (t && typeof t.left === 'number') ? String(t.left) : '—';
+      document.getElementById('qCharged').textContent =
+        (t && typeof t.used === 'number') ? String(t.used) : '—';
     } catch(e){}
     meta.textContent = '账号数 ' + (q ? q.accounts : '—')
       + ' · 统计时间 ' + (s.statsAt || '—')
@@ -358,13 +392,14 @@ function render(items){
   ITEMS = items || [];
   const tb = $('#tbody');
   tb.innerHTML = '';
-  if (!ITEMS.length){ tb.innerHTML = '<tr><td colspan="9" class="hint">暂无账号</td></tr>'; }
+  if (!ITEMS.length){ tb.innerHTML = '<tr><td colspan="10" class="hint">暂无账号</td></tr>'; }
   ITEMS.forEach(it => {
     const tr = document.createElement('tr');
     const cell = v => '<td>' + (v === undefined || v === null || v === '' ? '—' : String(v)) + '</td>';
     tr.innerHTML = '<td><input type="checkbox" class="pick" value="' + it.id + '"></td>'
       + cell(it.id) + cell(it.qq) + cell(it.note)
-      + cell(it.tierLabel || it.tier) + cell(it.modeText || it.mode)
+      + cell(it.tierLabel || it.tier) + cell(QB7 && QB7[String(it.qq)] || '')
+      + cell(it.modeText || it.mode)
       + cell(it.quota) + cell(it.used)
       + '<td><span class="tag">' + (it.status || '—') + '</span></td>';
     tb.appendChild(tr);
@@ -402,6 +437,7 @@ async function runBatch(ids, fn, label){
 }
 
 async function refresh(){
+  loadQb7();
   try { const r = await api.accounts(); render(r.items || []); }
   catch(e){ log('读取账号失败：' + e.message); }
 }
