@@ -53,7 +53,7 @@
   .q > span{display:block;font-size:11.5px;color:var(--sub)}
   .q b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);margin-top:3px;white-space:nowrap}
   .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
-  .q .qsub em{font-style:normal;font-weight:600;color:var(--ink);font-size:12.5px}
+  .q .qsub em{font-style:normal;font-weight:400;color:var(--ink);font-size:12.5px}
   @media(max-width:720px){.qstats{grid-template-columns:1fr}}
 
   @media(max-width:720px){
@@ -82,8 +82,8 @@
         <b><span id="qTotal">—</span> / <span id="qHist">—</span></b>
         <i class="qsub">已分配 / 未分配 / 已用</i>
         <i class="qsub"><em id="qAlloc">—</em> / <em id="qFree">—</em> / <em id="qUsed">—</em></i></div>
-      <div class="q"><span>Q币总和 / 今日充</span>
-        <b><span id="qQb">—</span> / <span id="qToday">—</span></b>
+      <div class="q"><span>Q币总和 / 今日充 / 还能充</span>
+        <b><span id="qQb">—</span> / <span id="qToday">—</span> / <span id="qLeft">—</span></b>
         <i class="qsub">总折扣 / 今日折扣</i>
         <i class="qsub"><em id="qZhe">—</em> / <em id="qZheToday">—</em></i></div>
     </div>
@@ -253,6 +253,13 @@ async function loadQuota(){
       document.getElementById('qToday').textContent    = today.length ? String(r3(amt)) : '—';
       document.getElementById('qZheToday').textContent = amt ? ((cost / amt * 10).toFixed(2) + ' 折') : '—';
       renderToday(today);
+    } catch(e){}
+    // 还能充（合计）：原网页汇总表的 overview.total.left，服务端算好直接取
+    try {
+      const a = await api.accounts();
+      const t = a && a.overview && a.overview.total;
+      document.getElementById('qLeft').textContent =
+        (t && typeof t.left === 'number') ? String(t.left) : '—';
     } catch(e){}
     meta.textContent = '账号数 ' + (q ? q.accounts : '—')
       + ' · 统计时间 ' + (s.statsAt || '—')

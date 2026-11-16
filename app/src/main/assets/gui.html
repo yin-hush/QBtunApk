@@ -38,6 +38,7 @@
   .msg{font-size:12px;color:var(--sub)}
 
   .tabs{display:flex;gap:8px;align-items:center;padding:4px 16px 8px}
+  .tabs .tabsub{font-style:normal;font-size:10px;opacity:.72;margin-left:3px}
   .frames{flex:1;margin:0 16px 10px;border:1px solid var(--line);border-radius:10px;
           overflow:hidden;background:#fff;position:relative}
   iframe{width:100%;height:100%;border:0;display:block}
@@ -116,7 +117,7 @@
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.9</span>
+  <h1>QB囤 · 安卓版</h1><span class="ver">1.1.01</span>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
@@ -139,9 +140,9 @@
 </div>
 
 <div class="tabs">
-  <button id="tabTool" class="on">批量控制台</button>
-  <button id="tabOrigin">原网页（原封不动）</button>
-  <button id="tabBill">额度账单</button>
+  <button id="tabTool" class="on">控制台<i class="tabsub">批量</i></button>
+  <button id="tabOrigin">原网页</button>
+  <button id="tabBill">账单</button>
   <span class="addr">三个页面同源，共用同一份登录态</span>
   <span style="flex:1"></span>
   <button id="tabBack" title="后退（作用于当前显示的页面）">← 返回</button>
