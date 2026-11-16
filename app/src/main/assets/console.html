@@ -50,8 +50,8 @@
   .foot{margin-top:8px;font-size:12px;color:var(--sub)}
   .qstats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   .q{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fbfdfc}
-  .q span{display:block;font-size:11.5px;color:var(--sub)}
-  .q b{display:block;font-size:19px;margin-top:2px}
+  .q > span{display:block;font-size:11.5px;color:var(--sub)}
+  .q b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);margin-top:3px;white-space:nowrap}
   .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
   .q .qsub em{font-style:normal;font-weight:600;color:var(--ink);font-size:12.5px}
   @media(max-width:720px){.qstats{grid-template-columns:1fr}}
@@ -78,10 +78,14 @@
   <div class="card" id="quotaCard">
     <h2>额度统计</h2>
     <div class="qstats">
-      <div class="q"><span>剩余额度</span><b id="qTotal">—</b>
-        <i class="qsub">已分配 <em id="qAlloc">—</em> · 未分配 <em id="qFree">—</em> · 已用 <em id="qUsed">—</em> · 历史总 <em id="qHist">—</em></i></div>
-      <div class="q"><span>Q币总和</span><b id="qQb">—</b>
-        <i class="qsub">总折扣 <em id="qZhe">—</em></i></div>
+      <div class="q"><span>剩余额度 / 历史总</span>
+        <b><span id="qTotal">—</span> / <span id="qHist">—</span></b>
+        <i class="qsub">已分配 / 未分配 / 已用</i>
+        <i class="qsub"><em id="qAlloc">—</em> / <em id="qFree">—</em> / <em id="qUsed">—</em></i></div>
+      <div class="q"><span>Q币总和 / 今日充</span>
+        <b><span id="qQb">—</span> / <span id="qToday">—</span></b>
+        <i class="qsub">总折扣 / 今日折扣</i>
+        <i class="qsub"><em id="qZhe">—</em> / <em id="qZheToday">—</em></i></div>
     </div>
     <div class="foot" id="qMeta" style="margin-top:7px">额度账单：quota_log.txt（每次启动记录）</div>
   </div>
@@ -89,7 +93,18 @@
   <div class="warn">⚠️ 下面每个操作都会<strong>真实修改服务端数据</strong>（发卡会占用额度、触发上游登录；改档位/改模式会触发服务端重跑）。执行前会二次确认，建议先小批量试跑。</div>
 
   <div class="card">
-    <h2>1 · 账号列表</h2>
+    <h2>1 · 今日到账</h2>
+    <div class="tbl-wrap" style="max-height:220px">
+      <table>
+        <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th><th>折扣</th></tr></thead>
+        <tbody id="todayBody"><tr><td colspan="6" class="hint">无</td></tr></tbody>
+      </table>
+    </div>
+    <div class="foot" id="todayMeta" style="margin-top:7px"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · 账号列表</h2>
     <div class="row" style="margin-bottom:9px">
       <button id="btnRefresh" class="primary">刷新列表</button>
       <button id="btnAll">全选</button>
@@ -106,7 +121,7 @@
 
   <div class="grid">
     <div class="card">
-      <h2>2 · 改额度 / 改档位（对选中账号）</h2>
+      <h2>3 · 改额度 / 改档位（对选中账号）</h2>
       <div class="grid">
         <div>
           <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
@@ -122,7 +137,7 @@
     </div>
 
     <div class="card">
-      <h2>3 · 改模式 / 改昵称</h2>
+      <h2>4 · 改模式 / 改昵称</h2>
       <label>模式</label><select id="modeVal"></select>
       <div style="height:8px"></div>
       <button class="primary" id="btnMode">批量改模式</button>
@@ -134,7 +149,7 @@
   </div>
 
   <div class="card">
-    <h2>4 · 批量发卡</h2>
+    <h2>5 · 批量发卡</h2>
     <label>数量</label><input id="cardN" type="number" value="1" min="1" max="50">
     <div style="height:8px"></div>
     <div class="row">
@@ -179,6 +194,39 @@ const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // 顶部额度统计区（安卓版：数据来自同源 API，由 app.js 计算）
+function todayStr(){
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+function r3(x){ return Math.round(x * 1000) / 1000; }
+// 今日到账：从 QB.qbill() 的 accounts[].records 里取 paidAt 是今天的明细，按时间正序
+function collectToday(b){
+  const day = todayStr(), rows = [];
+  ((b && b.accounts) || []).forEach(a => {
+    (a.records || []).forEach(r => {
+      if (String(r.paidAt || '').slice(0, 10) === day)
+        rows.push({ paidAt: r.paidAt || '', note: a.note || '', qq: a.qq || '',
+                    amount: Number(r.amount) || 0, cost: Number(r.cost) || 0 });
+    });
+  });
+  rows.sort((x, y) => (x.paidAt < y.paidAt ? -1 : x.paidAt > y.paidAt ? 1 : 0));
+  return rows;
+}
+function renderToday(rows){
+  const body = document.getElementById('todayBody');
+  const meta = document.getElementById('todayMeta');
+  if (!rows.length){
+    body.innerHTML = '<tr><td colspan="6" class="hint">无</td></tr>';
+    meta.textContent = '今日（' + todayStr() + '）暂无充值到账';
+    return;
+  }
+  body.innerHTML = rows.map(r =>
+    '<tr><td>' + r.paidAt + '</td><td>' + r.note + '</td><td>' + r.qq + '</td>'
+    + '<td>' + r.amount + '</td><td>' + r.cost + '</td>'
+    + '<td>' + (r.amount ? ((r.cost / r.amount * 10).toFixed(2) + ' 折') : '—') + '</td></tr>'
+  ).join('');
+  meta.textContent = '今日（' + todayStr() + '）共 ' + rows.length + ' 笔';
+}
 async function loadQuota(){
   const meta = document.getElementById('qMeta');
   try {
@@ -191,13 +239,20 @@ async function loadQuota(){
       document.getElementById('qFree').textContent  = q.free;
       document.getElementById('qUsed').textContent  = q.used;
     }
-    // Q币总和 / 总折扣 来自 Q币账单（qb.log）统计
+    // Q币总和 / 总折扣 来自 Q币账单（qb.log）统计；今日充 / 今日折扣 / 今日到账按当天明细现算
     try {
-      const t = (QB.qbill && QB.qbill() || {}).total;
+      const b = (QB.qbill && QB.qbill()) || {};
+      const t = b.total;
       if (t && t.recordCount > 0){
         document.getElementById('qQb').textContent  = t.amount;
         document.getElementById('qZhe').textContent = t.zhe ? (t.zhe + ' 折') : '—';
       }
+      const today = collectToday(b);
+      let amt = 0, cost = 0;
+      today.forEach(r => { amt += r.amount; cost += r.cost; });
+      document.getElementById('qToday').textContent    = today.length ? String(r3(amt)) : '—';
+      document.getElementById('qZheToday').textContent = amt ? ((cost / amt * 10).toFixed(2) + ' 折') : '—';
+      renderToday(today);
     } catch(e){}
     meta.textContent = '账号数 ' + (q ? q.accounts : '—')
       + ' · 统计时间 ' + (s.statsAt || '—')
