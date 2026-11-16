@@ -15,8 +15,6 @@
   .wrap{max-width:1180px;margin:0 auto}
   header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
   h1{font-size:19px;margin:0}
-  .links a{color:var(--brand);text-decoration:none;margin-right:12px;font-size:13px}
-  .links a:hover{text-decoration:underline}
   .badge{padding:3px 10px;border-radius:999px;background:#e8eef0;color:var(--sub);font-size:12px}
   .badge.ok{background:var(--brand-weak);color:#137a63}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -50,13 +48,13 @@
   textarea{width:100%;min-height:96px;padding:9px;border:1px solid var(--line);border-radius:8px;
            font:12px/1.5 Consolas,monospace;resize:vertical}
   .foot{margin-top:8px;font-size:12px;color:var(--sub)}
-  .qstats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .qstats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
   .q{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fbfdfc}
   .q span{display:block;font-size:11.5px;color:var(--sub)}
   .q b{display:block;font-size:19px;margin-top:2px}
   .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
   .q .qsub em{font-style:normal;font-weight:600;color:var(--ink);font-size:12.5px}
-  @media(max-width:720px){.qstats{grid-template-columns:1fr 1fr}}
+  @media(max-width:720px){.qstats{grid-template-columns:1fr}}
 
   @media(max-width:720px){
     body{padding:10px}
@@ -65,7 +63,6 @@
     h1{font-size:16px}
     .card{padding:10px;margin-bottom:10px}
     .tbl-wrap{max-height:280px}
-    .links a{font-size:11px;margin-right:8px}
   }
 </style>
 </head>
@@ -73,7 +70,6 @@
 <div class="wrap">
   <header>
     <h1>QB囤 · 批量控制台</h1>
-    <span class="links"><a href="/">原网页（原封不动）</a><a href="/__tool">工具页</a></span>
     <span id="authBadge" class="badge">未检测登录态</span>
     <button id="btnForceRefresh" class="primary" style="padding:3px 12px;font-size:12px">立即刷新</button>
     <span class="hint">同源直连 · 需手机网络支持 IPv6 或有全局代理</span>
@@ -82,10 +78,8 @@
   <div class="card" id="quotaCard">
     <h2>额度统计</h2>
     <div class="qstats">
-      <div class="q"><span>剩余总额度</span><b id="qTotal">—</b>
-        <i class="qsub">已分配 <em id="qAlloc">—</em> · 未分配 <em id="qFree">—</em></i></div>
-      <div class="q"><span>历史总额度</span><b id="qHist">—</b>
-        <i class="qsub">已用额度（所有账号合计）<em id="qUsed">—</em></i></div>
+      <div class="q"><span>剩余额度</span><b id="qTotal">—</b>
+        <i class="qsub">已分配 <em id="qAlloc">—</em> · 未分配 <em id="qFree">—</em> · 已用 <em id="qUsed">—</em> · 历史总 <em id="qHist">—</em></i></div>
       <div class="q"><span>Q币总和</span><b id="qQb">—</b>
         <i class="qsub">总折扣 <em id="qZhe">—</em></i></div>
     </div>

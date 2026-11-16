@@ -116,7 +116,7 @@
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.7</span>
+  <h1>QB囤 · 安卓版</h1><span class="ver">1.0.8</span>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
@@ -143,6 +143,9 @@
   <button id="tabOrigin">原网页（原封不动）</button>
   <button id="tabBill">额度账单</button>
   <span class="addr">三个页面同源，共用同一份登录态</span>
+  <span style="flex:1"></span>
+  <button id="tabBack" title="后退（作用于当前显示的页面）">← 返回</button>
+  <button id="tabFwd" title="前进（作用于当前显示的页面）">前进 →</button>
 </div>
 
 <div class="frames" id="framesBox">
@@ -342,6 +345,7 @@ async function refresh(){
 }
 
 function tab(which){
+  curTab = which;
   const bill = which === 'bill';
   $('#tabTool').className   = which === 'tool'   ? 'on' : '';
   $('#tabOrigin').className = which === 'origin' ? 'on' : '';
@@ -353,6 +357,18 @@ function tab(which){
   if (which === 'origin' && !originLoaded){ $('#frameOrigin').src = '/'; originLoaded = true; }
   if (bill){ if (BILL_MODE === 'q') loadQ(false); else loadBill(); }
 }
+
+// 返回/前进：作用于当前显示的 iframe（同源，可直接操作其 history）
+let curTab = 'tool';
+function navFrame(dir){
+  const f = document.getElementById(curTab === 'origin' ? 'frameOrigin' : 'frameTool');
+  try {
+    const w = f && f.contentWindow;
+    if (w) { if (dir < 0) w.history.back(); else w.history.forward(); }
+  } catch(e){}
+}
+$('#tabBack').onclick = () => navFrame(-1);
+$('#tabFwd').onclick  = () => navFrame(1);
 
 $('#tabTool').onclick   = () => tab('tool');
 $('#tabOrigin').onclick = () => tab('origin');
