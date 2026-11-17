@@ -85,25 +85,25 @@
   </header>
 
   <div class="card" id="quotaCard">
-    <h2>额度统计</h2>
+    <h2>能量统计</h2>
     <div class="qstats">
       <div class="q q1"><div class="g1">
-        <span class="lab">剩余额度</span><span class="op">/</span><span class="lab">历史总</span>
+        <span class="lab">剩余能量</span><span class="op">/</span><span class="lab">历史总</span>
         <b class="val" id="qTotal">—</b><span class="op">/</span><b class="val" id="qHist">—</b>
       </div>
         <i class="qsub">已分配 / 未分配 / 已用</i>
         <i class="qsub"><em id="qAlloc">—</em> / <em id="qFree">—</em> / <em id="qUsed">—</em></i></div>
       <div class="q q2"><div class="g2">
-        <span class="lab">Q币总和</span><span class="op">/</span><span class="lab">今日</span><span class="op">-</span><span class="lab">已充</span><span class="op">/</span><span class="lab">还能充<i class="lsub">（七日内）</i></span>
+        <span class="lab">Q币总和</span><span class="op">/</span><span class="lab">今日<i class="lsub">(qb)</i></span><span class="op">-</span><span class="lab">已充</span><span class="op">/</span><span class="lab">还能充<i class="lsub">（七日内笔数）</i></span>
         <b class="val" id="qQb">—</b><span class="op">/</span><b class="val" id="qToday">0</b><span class="op">-</span><b class="val" id="qCharged">—</b><span class="op">/</span><b class="val" id="qLeft">—</b>
       </div>
-        <i class="qsub">总折扣 / 今日折扣</i>
+        <i class="qsub">平均折扣 / 今日折扣</i>
         <i class="qsub"><em id="qZhe">—</em> / <em id="qZheToday">—</em></i></div>
     </div>
-    <div class="foot" id="qMeta" style="margin-top:7px">额度账单：quota_log.txt（每次启动记录）</div>
+    <div class="foot" id="qMeta" style="margin-top:7px">能量账单：quota_log.txt（每次启动记录）</div>
   </div>
 
-  <div class="warn">⚠️ 下面每个操作都会<strong>真实修改服务端数据</strong>（发卡会占用额度、触发上游登录；改档位/改模式会触发服务端重跑）。执行前会二次确认，建议先小批量试跑。</div>
+  <div class="warn">⚠️ 下面每个操作都会真实修改服务端数据，执行前会二次确认。</div>
 
   <div class="card">
     <h2>1 · 今日到账</h2>
@@ -120,13 +120,13 @@
     <h2>2 · 账号列表</h2>
     <div class="row" style="margin-bottom:9px">
       <button id="btnRefresh" class="primary">刷新列表</button>
-      <button id="btnAll">全选</button>
-      <button id="btnNone">清空选择</button>
+      <button id="btnToggleAll">全选</button>
+      <button id="btnDelSel" class="danger" style="font-size:12px">批量删除</button>
       <span class="hint" id="selInfo">未加载</span>
     </div>
     <div class="tbl-wrap">
       <table>
-        <thead><tr><th></th><th>id</th><th>QQ</th><th>昵称</th><th>档位</th><th>已充<i class="lsub">（七日内）</i></th><th>模式</th><th>额度</th><th>已用</th><th>状态</th></tr></thead>
+        <thead><tr><th></th><th>id</th><th>QQ</th><th>昵称</th><th>档位</th><th>已充<i class="lsub">（七日内笔数）</i></th><th>模式</th><th>能量</th><th>已用</th><th>状态</th></tr></thead>
         <tbody id="tbody"><tr><td colspan="10" class="hint">点「刷新列表」加载</td></tr></tbody>
       </table>
     </div>
@@ -134,12 +134,12 @@
 
   <div class="grid">
     <div class="card">
-      <h2>3 · 改额度 / 改档位（对选中账号）</h2>
+      <h2>3 · 改能量 / 改档位（对选中账号）</h2>
       <div class="grid">
         <div>
-          <label>新额度 quota</label><input id="quotaVal" placeholder="例如 100">
+          <label>新能量 quota</label><input id="quotaVal" placeholder="例如 100">
           <div style="height:10px"></div>
-          <button class="primary" id="btnQuota">批量改额度</button>
+          <button class="primary" id="btnQuota">批量改能量</button>
         </div>
         <div>
           <label>目标档位 tier</label><select id="tierVal"></select>
@@ -167,7 +167,7 @@
     <div style="height:8px"></div>
     <div class="row">
       <div style="flex:1"><label>档位 tier</label><select id="cardTier"></select></div>
-      <div style="flex:1"><label>额度 quota</label><input id="cardQuota" value="20"></div>
+      <div style="flex:1"><label>能量 quota</label><input id="cardQuota" value="20"></div>
     </div>
     <div style="height:8px"></div>
     <div class="row">
@@ -206,7 +206,7 @@
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// 顶部额度统计区（安卓版：数据来自同源 API，由 app.js 计算）
+// 顶部能量统计区（安卓版：数据来自同源 API，由 app.js 计算）
 function todayStr(){
   const d = new Date(), p = n => String(n).padStart(2,'0');
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
@@ -271,7 +271,7 @@ async function loadQuota(){
       document.getElementById('qFree').textContent  = q.free;
       document.getElementById('qUsed').textContent  = q.used;
     }
-    // Q币总和 / 总折扣 来自 Q币账单（qb.log）统计；今日充 / 今日折扣 / 今日到账按当天明细现算
+    // Q币总和 / 平均折扣 来自 Q币账单（qb.log）统计；今日充 / 今日折扣 / 今日到账按当天明细现算
     try {
       const b = (QB.qbill && QB.qbill()) || {};
       const t = b.total;
@@ -297,8 +297,8 @@ async function loadQuota(){
     } catch(e){}
     meta.textContent = '账号数 ' + (q ? q.accounts : '—')
       + ' · 统计时间 ' + (s.statsAt || '—')
-      + ' · 额度账单：quota_log.txt（App 私有文件）';
-  } catch(e){ meta.textContent = '额度统计读取失败：' + e.message; }
+      + ' · 能量账单：quota_log.txt（App 私有文件）';
+  } catch(e){ meta.textContent = '能量统计读取失败：' + e.message; }
 }
 let ITEMS = [];
 
@@ -330,7 +330,8 @@ let APIS = {
   login:'/api/login', me:'/api/me', meta:'/api/shop/qb/meta',
   accounts:'/api/shop/qb/accounts', cardNew:'/api/shop/qb/card/new',
   quota:'/api/shop/qb/accounts/quota', tier:'/api/shop/qb/accounts/switch-tier',
-  mode:'/api/shop/qb/accounts/mode', note:'/api/shop/qb/accounts/note'
+  mode:'/api/shop/qb/accounts/mode', note:'/api/shop/qb/accounts/note',
+  delete:'/api/shop/qb/accounts/delete'
 };
 async function loadApis(){
   try {
@@ -347,7 +348,8 @@ const api = {
   quota:   (id,v) => call(APIS.quota, {id, quota:String(v)}),
   tier:    (id,t) => call(APIS.tier, {id, tier:String(t)}),
   mode:    (id,m) => call(APIS.mode, {id, mode:m}),
-  note:    (id,n) => call(APIS.note, {id, note:n})
+  note:    (id,n) => call(APIS.note, {id, note:n}),
+  del:     (id)   => call(APIS.delete, {id})
 };
 
 function setBadge(text, ok){
@@ -409,8 +411,10 @@ function render(items){
 }
 
 function updateSel(){
+  const boxes = document.querySelectorAll('.pick');
   const n = document.querySelectorAll('.pick:checked').length;
   $('#selInfo').textContent = '已选 ' + n + ' / ' + ITEMS.length;
+  $('#btnToggleAll').textContent = (boxes.length && n === boxes.length) ? '取消全选' : '全选';
 }
 
 function picked(){
@@ -442,15 +446,16 @@ async function refresh(){
   catch(e){ log('读取账号失败：' + e.message); }
 }
 
-// 立即刷新：重新检测登录态 + 重载档位 + 刷新账号列表 + 刷新额度统计
+// 立即刷新：重新检测登录态 + 重载档位 + 刷新账号列表 + 刷新能量统计
 async function refreshAll(){
   const ok = await checkMe();
   try { await loadMeta(); } catch(e){}
   await refresh();
+  await QB.refresh('', false);
   await loadQuota();
   return ok;
 }
-$('#btnRefresh').onclick = refresh;
+$('#btnRefresh').onclick = async () => { await refresh(); await QB.refresh('', false); await loadQuota(); };
 $('#btnForceRefresh').onclick = async () => {
   const btn = $('#btnForceRefresh');
   const old = btn.textContent; btn.disabled = true; btn.textContent = '刷新中…';
@@ -458,8 +463,21 @@ $('#btnForceRefresh').onclick = async () => {
   catch(e){ log('刷新失败：' + e.message); }
   finally { btn.disabled = false; btn.textContent = old; }
 };
-$('#btnAll').onclick  = () => { document.querySelectorAll('.pick').forEach(x => x.checked = true); updateSel(); };
-$('#btnNone').onclick = () => { document.querySelectorAll('.pick').forEach(x => x.checked = false); updateSel(); };
+$('#btnToggleAll').onclick = () => {
+  const boxes = document.querySelectorAll('.pick');
+  const allOn = boxes.length && document.querySelectorAll('.pick:checked').length === boxes.length;
+  boxes.forEach(x => x.checked = !allOn);
+  updateSel();
+};
+$('#btnDelSel').onclick = async () => {
+  const ids = picked();
+  if (!ids.length){ alert('请先勾选要删除的账号'); return; }
+  if (!confirm('将删除选中的 ' + ids.length + ' 个账号。\n删除前服务端会先结算该号最新充值，删除后下一轮巡检同步清理。\n\n此操作不可恢复，确定继续？')) return;
+  await runBatch(ids, id => api.del(id), '删除账号');
+  await refresh();
+  await QB.refresh('', false);
+  await loadQuota();
+};
 $('#tbody').addEventListener('change', updateSel);
 
 $('#btnCard').onclick = async () => {
@@ -470,8 +488,8 @@ $('#btnCard').onclick = async () => {
     note: $('#cardNote').value,
     mode: $('#cardMode').value
   };
-  if (!confirm('将生成 ' + n + ' 张卡密，每张额度 ' + body.quota
-      + '。\n发卡会占用账户额度并触发上游登录，确定继续？')) return;
+  if (!confirm('将生成 ' + n + ' 张卡密，每张能量 ' + body.quota
+      + '。\n发卡会占用账户能量并触发上游登录，确定继续？')) return;
   const urls = [];
   const delay = Math.max(0, parseFloat($('#delay').value) || 0);
   for (let i = 0; i < n; i++){
@@ -491,9 +509,9 @@ $('#btnCard').onclick = async () => {
 
 $('#btnQuota').onclick = async () => {
   const ids = picked(); const v = $('#quotaVal').value.trim();
-  if (!ids.length || v === ''){ alert('请勾选账号并填写额度'); return; }
-  if (!confirmRun('改额度', ids, 'quota=' + v)) return;
-  await runBatch(ids, id => api.quota(id, v), '改额度 → ' + v);
+  if (!ids.length || v === ''){ alert('请勾选账号并填写能量'); return; }
+  if (!confirmRun('改能量', ids, 'quota=' + v)) return;
+  await runBatch(ids, id => api.quota(id, v), '改能量 → ' + v);
   await refresh();
 };
 

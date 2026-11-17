@@ -117,13 +117,12 @@
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1><span class="ver">1.1.02</span>
+  <h1>QB囤 · 安卓版</h1>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
-  <button id="btnRefresh">刷新状态</button>
   <button id="btnCfg">配置</button>
-  <button id="btnRelogin">重新登录</button>
+  <button id="btnRelogin">重登</button>
 </header>
 
 <div class="card" id="cfgPanel" style="display:none">
@@ -156,18 +155,18 @@
 
 <div class="billpanel" id="billPanel" style="display:none">
   <div class="billhead">
-    <h2 id="billTitle">额度账单（有效数据）</h2>
+    <h2 id="billTitle">能量账单（有效数据）</h2>
     <button id="billCompact" class="on">精简展示</button>
     <button id="billAll">全部展示</button>
     <button id="billDaily">按日精简</button>
     <button id="billQ">Q币账单</button>
     <button id="billImport" class="io">导入</button>
     <button id="billExport" class="io">导出</button>
-    <span class="addr" id="billNote">quota_log.txt · 精简 = 每天最后一条 + 总额度变动点</span>
+    <span class="addr" id="billNote">quota_log.txt · 精简 = 每天最后一条 + 总能量变动点</span>
   </div>
   <div class="billtable-wrap" id="billTableWrap">
     <table class="billtable">
-      <thead><tr><th>时间</th><th>剩余总额度</th><th>已分配</th><th>未分配</th><th>已用额度</th><th>历史总额度</th></tr></thead>
+      <thead><tr><th>时间</th><th>剩余总能量</th><th>已分配</th><th>未分配</th><th>已用能量</th><th>历史总能量</th></tr></thead>
       <tbody id="billBody"><tr><td colspan="6" class="empty">读取中…</td></tr></tbody>
     </table>
   </div>
@@ -187,7 +186,7 @@
 const $ = s => document.querySelector(s);
 let originLoaded = false;
 
-// 额度账单 / Q币账单：精简 | 全部 | 按日精简 | q 四种展示
+// 能量账单 / Q币账单：精简 | 全部 | 按日精简 | q 四种展示
 let BILL_MODE = 'compact';
 let BILL_DATA = {all:[], compact:[], daily:[]};
 let Q_DATA = null;
@@ -239,7 +238,7 @@ function renderQ(){
     + card('充值笔数', t.recordCount) + '</div>'
     + '<div class="qgroup">'
     + card('Q币总和', fmt(t.amount)) + card('能量总和', fmt(t.cost))
-    + card('总折扣', fmt(t.discount, 4), fmt(t.zhe, 2) + ' 折') + '</div>';
+    + card('平均折扣', fmt(t.discount, 4), fmt(t.zhe, 2) + ' 折') + '</div>';
   const groups = Q_DATA.accounts || [];
   if (!groups.length){
     $('#qAccounts').innerHTML = '<div class="qempty">qb.log 里还没有任何账号，点「立即采集」抓取一次，或用「导入」恢复备份。</div>';
@@ -289,9 +288,9 @@ async function loadQ(collect){
 function currentKind(){ return BILL_MODE === 'q' ? 'qb' : 'quota'; }
 
 const BILL_NOTES = {
-  compact: 'quota_log.txt · 精简 = 每天最后一条 + 总额度变动点',
+  compact: 'quota_log.txt · 精简 = 每天最后一条 + 总能量变动点',
   all:     'quota_log.txt · 全部有效记录',
-  daily:   '按日精简：历史每日只留最新；连续≥3天剩余总额度不变只留首尾；今天不清理',
+  daily:   '按日精简：历史每日只留最新；连续≥3天剩余总能量不变只留首尾；今天不清理',
   q:       'qb.log · 按账号分类累积，导入为合并去重（不覆盖）'
 };
 function setBillMode(mode){
@@ -303,7 +302,7 @@ function setBillMode(mode){
   const isQ = mode === 'q';
   $('#billTableWrap').style.display = isQ ? 'none' : '';
   $('#qWrap').className = isQ ? 'qwrap on' : 'qwrap';
-  $('#billTitle').textContent = isQ ? 'Q币账单（本地累积）' : '额度账单（有效数据）';
+  $('#billTitle').textContent = isQ ? 'Q币账单（本地累积）' : '能量账单（有效数据）';
   $('#billNote').textContent = BILL_NOTES[mode] || '';
   if (isQ) loadQ(false); else renderBill();
 }
@@ -374,7 +373,6 @@ $('#tabFwd').onclick  = () => navFrame(1);
 $('#tabTool').onclick   = () => tab('tool');
 $('#tabOrigin').onclick = () => tab('origin');
 $('#tabBill').onclick   = () => tab('bill');
-$('#btnRefresh').onclick = refresh;
 $('#btnCfg').onclick = () => {
   const p = $('#cfgPanel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
