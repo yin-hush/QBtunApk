@@ -155,10 +155,7 @@
 
 <div class="billpanel" id="billPanel" style="display:none">
   <div class="billhead">
-    <h2 id="billTitle">能量账单（有效数据）</h2>
-    <button id="billCompact" class="on">精简展示</button>
-    <button id="billAll">全部展示</button>
-    <button id="billDaily">按日精简</button>
+    <button id="billEnergy" class="on">能量账单<span id="billModeLbl" style="font-size:10px;opacity:.7;margin-left:5px">精简</span></button>
     <button id="billQ">Q币账单</button>
     <button id="billImport" class="io">导入</button>
     <button id="billExport" class="io">导出</button>
@@ -174,7 +171,7 @@
     <div class="qbar">
       <button id="qRefresh" class="on">立即采集</button>
       <span class="addr" id="qCollectInfo"></span>
-      <span class="addr" id="qMeta">qb.log · 按账号分类累积，无记录记 null；网站仅留近 7 天</span>
+      <span class="addr" id="qMeta">qb.log · 按账号分类累积，无记录记 null</span>
     </div>
     <div class="qsum" id="qSum"></div>
     <div id="qAccounts"></div>
@@ -290,25 +287,22 @@ function currentKind(){ return BILL_MODE === 'q' ? 'qb' : 'quota'; }
 const BILL_NOTES = {
   compact: 'quota_log.txt · 精简 = 每天最后一条 + 总能量变动点',
   all:     'quota_log.txt · 全部有效记录',
-  daily:   '按日精简：历史每日只留最新；连续≥3天剩余总能量不变只留首尾；今天不清理',
   q:       'qb.log · 按账号分类累积，导入为合并去重（不覆盖）'
 };
 function setBillMode(mode){
   BILL_MODE = mode;
-  $('#billCompact').className = mode === 'compact' ? 'on' : '';
-  $('#billAll').className     = mode === 'all'     ? 'on' : '';
-  $('#billDaily').className   = mode === 'daily'   ? 'on' : '';
-  $('#billQ').className       = mode === 'q'       ? 'on' : '';
   const isQ = mode === 'q';
+  $('#billEnergy').className = isQ ? '' : 'on';
+  $('#billQ').className      = isQ ? 'on' : '';
+  $('#billModeLbl').textContent = mode === 'all' ? '全部' : '精简';
   $('#billTableWrap').style.display = isQ ? 'none' : '';
   $('#qWrap').className = isQ ? 'qwrap on' : 'qwrap';
-  $('#billTitle').textContent = isQ ? 'Q币账单（本地累积）' : '能量账单（有效数据）';
+  $('#billNote').style.display = isQ ? 'none' : '';
   $('#billNote').textContent = BILL_NOTES[mode] || '';
   if (isQ) loadQ(false); else renderBill();
 }
-$('#billCompact').onclick = () => setBillMode('compact');
-$('#billAll').onclick     = () => setBillMode('all');
-$('#billDaily').onclick   = () => setBillMode('daily');
+// 点「能量账单」在精简/全部之间切换（像全选/取消全选）
+$('#billEnergy').onclick = () => setBillMode(BILL_MODE === 'compact' ? 'all' : 'compact');
 $('#billQ').onclick       = () => setBillMode('q');
 $('#qRefresh').onclick    = () => loadQ(true);
 

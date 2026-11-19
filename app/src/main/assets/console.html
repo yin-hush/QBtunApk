@@ -36,6 +36,7 @@
   .hint{font-size:12px;color:var(--sub)}
   .warn{background:#fff8ec;border:1px solid #f0dcb8;color:#8a5a10;
         padding:8px 11px;border-radius:8px;font-size:12px;margin-bottom:12px}
+  .warn-sub{font-size:10px;opacity:.75;margin-left:6px}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
   th{color:var(--sub);font-weight:600;background:#fafcfb}
@@ -52,8 +53,13 @@
   .q{border:1px solid var(--line);border-radius:9px;padding:8px 11px;background:#fbfdfc}
   .q > span{display:block;font-size:11.5px;color:var(--sub)}
   .q b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);margin-top:3px;white-space:nowrap}
-  .q .qsub{display:block;font-style:normal;font-size:11.5px;color:var(--sub);margin-top:3px}
-  .q .qsub em{font-style:normal;font-weight:400;color:var(--ink);font-size:12.5px}
+  /* 小字行也用 grid：标签与数值同列居中对齐 */
+  .q .gsub{display:grid;row-gap:2px;align-items:center;width:max-content;margin-top:5px}
+  .q .gsub.gs3{grid-template-columns:max-content 12px max-content 12px max-content} /* 已分配/未分配/已用 */
+  .q .gsub.gs2{grid-template-columns:max-content 12px max-content}                 /* 平均折扣/今日折扣 */
+  .q .gsub .lab{font-size:11.5px;color:var(--sub);text-align:center;white-space:nowrap}
+  .q .gsub .sval{font-size:12.5px;font-weight:400;color:var(--ink);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .q .gsub .op{color:var(--sub);font-size:12px;text-align:center;font-weight:400}
   .lsub{font-style:normal;font-weight:400;font-size:8px;color:var(--sub);margin-left:2px}
   /* 第一、二卡统一用表格式 grid：标签/数值同列居中，分隔符独占一列且非黑体 */
   .q.q1 .g1,.q.q2 .g2{display:grid;row-gap:3px;align-items:center;width:max-content}
@@ -91,22 +97,26 @@
         <span class="lab">剩余能量</span><span class="op">/</span><span class="lab">历史总</span>
         <b class="val" id="qTotal">—</b><span class="op">/</span><b class="val" id="qHist">—</b>
       </div>
-        <i class="qsub">已分配 / 未分配 / 已用</i>
-        <i class="qsub"><em id="qAlloc">—</em> / <em id="qFree">—</em> / <em id="qUsed">—</em></i></div>
+        <div class="gsub gs3">
+          <span class="lab">已分配</span><span class="op">/</span><span class="lab">未分配</span><span class="op">/</span><span class="lab">已用</span>
+          <span class="sval" id="qAlloc">—</span><span class="op">/</span><span class="sval" id="qFree">—</span><span class="op">/</span><span class="sval" id="qUsed">—</span>
+        </div></div>
       <div class="q q2"><div class="g2">
         <span class="lab">Q币总和</span><span class="op">/</span><span class="lab">今日<i class="lsub">(qb)</i></span><span class="op">-</span><span class="lab">已充</span><span class="op">/</span><span class="lab">还能充<i class="lsub">（七日内笔数）</i></span>
         <b class="val" id="qQb">—</b><span class="op">/</span><b class="val" id="qToday">0</b><span class="op">-</span><b class="val" id="qCharged">—</b><span class="op">/</span><b class="val" id="qLeft">—</b>
       </div>
-        <i class="qsub">平均折扣 / 今日折扣</i>
-        <i class="qsub"><em id="qZhe">—</em> / <em id="qZheToday">—</em></i></div>
+        <div class="gsub gs2">
+          <span class="lab">平均折扣</span><span class="op">/</span><span class="lab">今日折扣</span>
+          <span class="sval" id="qZhe">—</span><span class="op">/</span><span class="sval" id="qZheToday">—</span>
+        </div></div>
     </div>
     <div class="foot" id="qMeta" style="margin-top:7px">能量账单：quota_log.txt（每次启动记录）</div>
   </div>
 
-  <div class="warn">⚠️ 下面每个操作都会真实修改服务端数据，执行前会二次确认。</div>
+  <div class="warn">⚠️ 下面每个操作都会真实修改服务端数据，执行前会二次确认。<br>串行处理批量请求，底部执行日志全部处理完成才可退出<span class="warn-sub">（服务器响应慢；提前退，靠后的请求不发送）</span></div>
 
   <div class="card">
-    <h2>1 · 今日到账</h2>
+    <h2>1 · 今/昨日到账 <span id="todayTotals" style="font-weight:400;font-size:11.5px;color:var(--sub);margin-left:8px"></span></h2>
     <div class="tbl-wrap" style="max-height:220px">
       <table>
         <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th></tr></thead>
@@ -212,33 +222,48 @@ function todayStr(){
   return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
 }
 function r3(x){ return Math.round(x * 1000) / 1000; }
-// 今日到账：从 QB.qbill() 的 accounts[].records 里取 paidAt 是今天的明细，按时间正序
-function collectToday(b){
-  const day = todayStr(), rows = [];
+// 今/昨日到账：从 QB.qbill() 的 accounts[].records 里取今天+昨天的明细，按时间倒序（新在上）
+function dateOffsetStr(offset){
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+function collectTD(b){
+  const td = dateOffsetStr(0), yd = dateOffsetStr(-1), rows = [];
   ((b && b.accounts) || []).forEach(a => {
     (a.records || []).forEach(r => {
-      if (String(r.paidAt || '').slice(0, 10) === day)
+      const d = String(r.paidAt || '').slice(0, 10);
+      if (d === td || d === yd)
         rows.push({ paidAt: r.paidAt || '', note: a.note || '', qq: a.qq || '',
-                    amount: Number(r.amount) || 0, cost: Number(r.cost) || 0 });
+                    amount: Number(r.amount) || 0, cost: Number(r.cost) || 0, day: d });
     });
   });
-  rows.sort((x, y) => (x.paidAt < y.paidAt ? -1 : x.paidAt > y.paidAt ? 1 : 0));
+  rows.sort((x, y) => (x.paidAt < y.paidAt ? 1 : x.paidAt > y.paidAt ? -1 : 0)); // 新→旧
   return rows;
 }
-// 七日已充：qq → 「60币·3笔」（paidAt 在今天往前 7 天内，含今天）
+// 顶部「今日 X币·X笔 昨日 X币·X笔」统计
+function renderTodayTotals(rows){
+  const el = document.getElementById('todayTotals');
+  if (!el) return;
+  const td = dateOffsetStr(0), yd = dateOffsetStr(-1), acc = {td:{a:0,n:0}, yd:{a:0,n:0}};
+  rows.forEach(r => {
+    const k = r.day === td ? 'td' : (r.day === yd ? 'yd' : null);
+    if (k){ acc[k].a += r.amount; acc[k].n++; }
+  });
+  el.innerHTML = '今日 <b>' + r3(acc.td.a) + '</b>币·<b>' + acc.td.n + '</b>笔　'
+               + '昨日 <b>' + r3(acc.yd.a) + '</b>币·<b>' + acc.yd.n + '</b>笔';
+}
+// 七日已充：qq → 「60币·3笔」（严格 7×24 小时窗口，精确到秒）
 let QB7 = null;
 function loadQb7(){
   try {
     const b = (QB.qbill && QB.qbill()) || {};
-    const p = n => String(n).padStart(2, '0');
-    const cut = new Date(); cut.setDate(cut.getDate() - 6);
-    const cutStr = cut.getFullYear() + '-' + p(cut.getMonth()+1) + '-' + p(cut.getDate());
-    const endStr = todayStr(), m = {};
+    const now = Date.now(), cut = now - 7 * 24 * 3600 * 1000, m = {};
     ((b && b.accounts) || []).forEach(a => {
       let amt = 0, n = 0;
       (a.records || []).forEach(r => {
-        const d = String(r.paidAt || '').slice(0, 10);
-        if (d >= cutStr && d <= endStr){ amt += Number(r.amount) || 0; n++; }
+        const ts = Date.parse(String(r.paidAt || '').replace(' ', 'T'));
+        if (!isNaN(ts) && ts >= cut && ts <= now){ amt += Number(r.amount) || 0; n++; }
       });
       if (n) m[String(a.qq || '')] = r3(amt) + '币·' + n + '笔';
     });
@@ -250,14 +275,14 @@ function renderToday(rows){
   const meta = document.getElementById('todayMeta');
   if (!rows.length){
     body.innerHTML = '<tr><td colspan="5" class="hint">无</td></tr>';
-    meta.textContent = '今日（' + todayStr() + '）暂无充值到账';
+    meta.textContent = '今/昨日暂无充值到账';
     return;
   }
   body.innerHTML = rows.map(r =>
     '<tr><td>' + r.paidAt + '</td><td>' + r.note + '</td><td>' + r.qq + '</td>'
     + '<td>' + r.amount + '</td><td>' + r.cost + '</td></tr>'
   ).join('');
-  meta.textContent = '今日（' + todayStr() + '）共 ' + rows.length + ' 笔';
+  meta.textContent = '今/昨日（' + dateOffsetStr(-1) + ' ~ ' + todayStr() + '）共 ' + rows.length + ' 笔';
 }
 async function loadQuota(){
   const meta = document.getElementById('qMeta');
@@ -279,12 +304,14 @@ async function loadQuota(){
         document.getElementById('qQb').textContent  = t.amount;
         document.getElementById('qZhe').textContent = t.zhe ? (t.zhe + ' 折') : '—';
       }
-      const today = collectToday(b);
+      const td = dateOffsetStr(0), recent = collectTD(b);
+      const todayRows = recent.filter(r => r.day === td);
       let amt = 0, cost = 0;
-      today.forEach(r => { amt += r.amount; cost += r.cost; });
+      todayRows.forEach(r => { amt += r.amount; cost += r.cost; });
       document.getElementById('qToday').textContent    = String(r3(amt)); // 今日无到账写 0
       document.getElementById('qZheToday').textContent = amt ? ((cost / amt * 10).toFixed(2) + ' 折') : '—';
-      renderToday(today);
+      renderTodayTotals(recent);
+      renderToday(recent);
     } catch(e){}
     // 还能充 / 已充（合计）：原网页汇总表的 overview.total，服务端算好直接取
     try {

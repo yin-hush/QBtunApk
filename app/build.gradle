@@ -10,8 +10,8 @@ android {
         applicationId 'com.yinhush.qbtun'
         minSdk 26
         targetSdk 34
-        versionCode 13
-        versionName '1.1.03'
+        versionCode 14
+        versionName '1.1.04'
     }
 
     // 固定调试签名：每次 CI 构建用同一把钥匙，后续版本可直接覆盖安装
