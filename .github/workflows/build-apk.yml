@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write   # 允许创建 Release 并上传 APK 附件
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -44,9 +47,28 @@ jobs:
       - name: Assemble debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: QBtun-debug-apk
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # 自动发布到 Releases：读 versionName 做 tag，同名版本会更新已有 Release 的附件
+      - name: Read version
+        id: ver
+        run: |
+          V=$(grep -oP "versionName '\K[^']+" app/build.gradle | head -1)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: QB囤安卓版 v${{ steps.ver.outputs.version }}
+          body: |
+            自动构建发布（versionCode ${{ github.run_number }}）。
+            与历史版本同签名，可直接覆盖安装。
+          files: app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
