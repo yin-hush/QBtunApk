@@ -22,6 +22,7 @@
   .card h2{font-size:14px;margin:0 0 10px;color:var(--ink)}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+  .grid2x2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 22px}
   label{display:block;font-size:12px;color:var(--sub);margin-bottom:4px}
   input,select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;
                background:#fff;color:var(--ink);font:inherit;font-size:13px}
@@ -79,6 +80,31 @@
     .card{padding:10px;margin-bottom:10px}
     .tbl-wrap{max-height:280px}
   }
+  /* 批量执行进度浮窗 */
+  .prog{position:fixed;right:18px;bottom:18px;width:360px;max-width:calc(100vw - 36px);
+        background:var(--card);border:1px solid var(--line);border-radius:10px;
+        box-shadow:0 6px 24px rgba(20,38,31,.18);z-index:999;display:none;overflow:hidden}
+  .prog.on{display:block}
+  .prog-hd{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--brand-weak);
+           cursor:pointer;user-select:none;font-size:12.5px;color:#137a63;font-weight:600}
+  .prog-hd .t{flex:1}
+  .prog-hd button{padding:0;width:20px;height:20px;line-height:18px;border:0;background:transparent;
+                  font-size:15px;color:#137a63;cursor:pointer;border-radius:4px}
+  .prog-hd button:hover{background:rgba(19,122,99,.15)}
+  .prog-body{padding:8px 10px}
+  .prog.min .prog-body{display:none}
+  .prog pre{margin:0;max-height:200px;overflow:auto;font:11.5px/1.5 Consolas,monospace;
+            white-space:pre-wrap;word-break:break-all;background:var(--bg);color:var(--ink);
+            padding:8px;border-radius:6px}
+  /* 完成提示 */
+  .mask{position:fixed;inset:0;background:rgba(20,38,31,.35);z-index:1000;display:none;
+        align-items:center;justify-content:center}
+  .mask.on{display:flex}
+  .dlg{background:var(--card);border-radius:12px;padding:18px 22px;min-width:260px;max-width:90vw;
+       box-shadow:0 8px 28px rgba(20,38,31,.22);text-align:center}
+  .dlg h3{margin:0 0 8px;font-size:16px;color:var(--ink)}
+  .dlg p{margin:0 0 14px;font-size:13px;color:var(--sub);line-height:1.6}
+  .dlg button{padding:6px 22px}
 </style>
 </head>
 <body>
@@ -119,8 +145,8 @@
     <h2>1 · 今/昨日到账 <span id="todayTotals" style="font-weight:400;font-size:11.5px;color:var(--sub);margin-left:8px"></span></h2>
     <div class="tbl-wrap" style="max-height:220px">
       <table>
-        <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th></tr></thead>
-        <tbody id="todayBody"><tr><td colspan="5" class="hint">无</td></tr></tbody>
+        <thead><tr><th>时间</th><th>昵称</th><th>QQ</th><th>Q币</th><th>能量</th><th>折扣</th></tr></thead>
+        <tbody id="todayBody"><tr><td colspan="6" class="hint">无</td></tr></tbody>
       </table>
     </div>
     <div class="foot" id="todayMeta" style="margin-top:7px"></div>
@@ -142,32 +168,29 @@
     </div>
   </div>
 
-  <div class="grid">
-    <div class="card">
-      <h2>3 · 改能量 / 改档位（对选中账号）</h2>
-      <div class="grid">
-        <div>
-          <label>新能量 quota</label><input id="quotaVal" placeholder="例如 100">
-          <div style="height:10px"></div>
-          <button class="primary" id="btnQuota">批量改能量</button>
-        </div>
-        <div>
-          <label>目标档位 tier</label><select id="tierVal"></select>
-          <div style="height:10px"></div>
-          <button class="primary" id="btnTier">批量换档位</button>
-        </div>
+  <div class="card">
+    <h2>3 · 批量修改（对选中账号）</h2>
+    <div class="grid2x2">
+      <div>
+        <label>新能量 quota</label><input id="quotaVal" placeholder="例如 100">
+        <div style="height:10px"></div>
+        <button class="primary" id="btnQuota">批量改能量</button>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>4 · 改模式 / 改昵称</h2>
-      <label>模式</label><select id="modeVal"></select>
-      <div style="height:8px"></div>
-      <button class="primary" id="btnMode">批量改模式</button>
-      <div style="height:10px"></div>
-      <label>昵称 note</label><input id="noteVal" placeholder="留空表示清空昵称">
-      <div style="height:8px"></div>
-      <button id="btnNote">批量改昵称</button>
+      <div>
+        <label>目标档位 tier</label><select id="tierVal"></select>
+        <div style="height:10px"></div>
+        <button class="primary" id="btnTier">批量换档位</button>
+      </div>
+      <div>
+        <label>模式</label><select id="modeVal"></select>
+        <div style="height:10px"></div>
+        <button class="primary" id="btnMode">批量改模式</button>
+      </div>
+      <div>
+        <label>昵称 note</label><input id="noteVal" placeholder="留空表示清空昵称">
+        <div style="height:10px"></div>
+        <button class="primary" id="btnNote">批量改昵称</button>
+      </div>
     </div>
   </div>
 
@@ -212,6 +235,22 @@
 </div>
 
 <script src="/__app.js"></script>
+<div id="progBox" class="prog">
+  <div class="prog-hd" id="progHd">
+    <span class="t" id="progTitle">执行进度</span>
+    <button id="progMin" title="最小化">−</button>
+    <button id="progClose" title="关闭">×</button>
+  </div>
+  <div class="prog-body"><pre id="progLog"></pre></div>
+</div>
+<div id="msgMask" class="mask">
+  <div class="dlg">
+    <h3 id="msgTitle">完成</h3>
+    <p id="msgBody"></p>
+    <button class="primary" id="msgOk">确定</button>
+  </div>
+</div>
+
 <script>
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -274,13 +313,14 @@ function renderToday(rows){
   const body = document.getElementById('todayBody');
   const meta = document.getElementById('todayMeta');
   if (!rows.length){
-    body.innerHTML = '<tr><td colspan="5" class="hint">无</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="hint">无</td></tr>';
     meta.textContent = '今/昨日暂无充值到账';
     return;
   }
   body.innerHTML = rows.map(r =>
     '<tr><td>' + r.paidAt + '</td><td>' + r.note + '</td><td>' + r.qq + '</td>'
-    + '<td>' + r.amount + '</td><td>' + r.cost + '</td></tr>'
+    + '<td>' + r.amount + '</td><td>' + r.cost + '</td>'
+    + '<td>' + (r.amount ? (r.cost / r.amount * 10).toFixed(2) + ' 折' : '—') + '</td></tr>'
   ).join('');
   meta.textContent = '今/昨日（' + dateOffsetStr(-1) + ' ~ ' + todayStr() + '）共 ' + rows.length + ' 笔';
 }
@@ -334,7 +374,38 @@ function log(msg){
   if (el.textContent === '等待操作…') el.textContent = '';
   el.textContent += msg + '\n';
   el.scrollTop = el.scrollHeight;
+  const p = $('#progLog');
+  if (p){ p.textContent += msg + '\n'; p.scrollTop = p.scrollHeight; }
 }
+// 进度浮窗
+function progOpen(label, total){
+  $('#progLog').textContent = '';
+  $('#progTitle').textContent = label + ' · 0/' + total;
+  $('#progBox').classList.add('on');
+  $('#progBox').classList.remove('min');
+  $('#progMin').textContent = '−';
+}
+function progStep(done, total, label){
+  $('#progTitle').textContent = label + ' · ' + done + '/' + total;
+}
+function showMsg(title, body){
+  $('#msgTitle').textContent = title;
+  $('#msgBody').innerHTML = body;
+  $('#msgMask').classList.add('on');
+}
+$('#msgOk').onclick = () => $('#msgMask').classList.remove('on');
+$('#progClose').onclick = e => { e.stopPropagation(); $('#progBox').classList.remove('on'); };
+$('#progMin').onclick = e => {
+  e.stopPropagation();
+  const box = $('#progBox');
+  box.classList.toggle('min');
+  $('#progMin').textContent = box.classList.contains('min') ? '+' : '−';
+};
+$('#progHd').onclick = () => {
+  const box = $('#progBox');
+  box.classList.toggle('min');
+  $('#progMin').textContent = box.classList.contains('min') ? '+' : '−';
+};
 
 async function call(path, body){
   const opt = {
@@ -427,7 +498,7 @@ function render(items){
     const cell = v => '<td>' + (v === undefined || v === null || v === '' ? '—' : String(v)) + '</td>';
     tr.innerHTML = '<td><input type="checkbox" class="pick" value="' + it.id + '"></td>'
       + cell(it.id) + cell(it.qq) + cell(it.note)
-      + cell(it.tierLabel || it.tier) + cell(QB7 && QB7[String(it.qq)] || '')
+      + cell(it.tierLabel || it.tier) + cell((QB7 && QB7[String(it.qq)]) || '0')
       + cell(it.modeText || it.mode)
       + cell(it.quota) + cell(it.used)
       + '<td><span class="tag">' + (it.status || '—') + '</span></td>';
@@ -457,18 +528,26 @@ async function runBatch(ids, fn, label){
   const delay = Math.max(0, parseFloat($('#delay').value) || 0);
   const stop = $('#stopOnErr').checked;
   let ok = 0, fail = 0;
+  progOpen(label, ids.length);
   for (let i = 0; i < ids.length; i++){
     log('[' + (i+1) + '/' + ids.length + '] ' + label + ' id=' + ids[i] + ' …');
     try { const r = await fn(ids[i]); ok++; log('   ✓ ' + (r && r.url ? r.url : 'OK')); }
     catch(e){ fail++; log('   ✗ ' + e.message); if (stop) break; }
+    progStep(i+1, ids.length, label);
     if (i < ids.length - 1 && delay) await sleep(delay * 1000);
   }
   log('完成：成功 ' + ok + '，失败 ' + fail);
+  progStep(ok+fail, ids.length, label);
+  const stopped = ok + fail < ids.length;
+  showMsg(fail ? '执行完成（有失败）' : '执行成功',
+    '「' + label + '」已处理 ' + (ok+fail) + '/' + ids.length + ' 个账号<br>'
+    + '成功 <b>' + ok + '</b>　失败 <b>' + fail + '</b>'
+    + (stopped ? '<br><span style="color:var(--warn)">（出错停止，剩余未处理）</span>' : ''));
   return {ok, fail};
 }
 
 async function refresh(){
-  loadQb7();
+  await loadQb7();
   try { const r = await api.accounts(); render(r.items || []); }
   catch(e){ log('读取账号失败：' + e.message); }
 }
