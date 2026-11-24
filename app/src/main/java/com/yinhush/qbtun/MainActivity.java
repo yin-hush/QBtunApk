@@ -2,14 +2,19 @@ package com.yinhush.qbtun;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.Log;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
@@ -23,6 +28,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -33,9 +39,13 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * QB囤 安卓版：一个原生 WebView 壳。
@@ -64,6 +74,32 @@ public class MainActivity extends Activity {
     private static final int REQ_EXPORT = 1001;
     private static final int REQ_IMPORT = 1002;
     private static final int MAX_IMPORT_BYTES = 8 * 1024 * 1024;  // 导入文件上限，避免 OOM
+    // 检查更新
+    private static final String UPDATE_API = "https://api.github.com/repos/yin-hush/QBtunApk/releases/latest";
+    private static final String UPDATE_PAGE = "https://github.com/yin-hush/QBtunApk/releases/latest";
+    private final ExecutorService netPool = Executors.newSingleThreadExecutor();
+    private DownloadManager dlManager;
+    private final BroadcastReceiver downloadDone = new BroadcastReceiver() {
+        @Override public void onReceive(Context c, Intent intent) {
+            long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+            if (dlManager == null || id < 0) return;
+            DownloadManager.Query q = new DownloadManager.Query().setFilterById(id);
+            android.database.Cursor cur = dlManager.query(q);
+            try {
+                if (cur == null || !cur.moveToFirst()) return;
+                int status = cur.getInt(cur.getColumnIndex(DownloadManager.COLUMN_STATUS));
+                if (status != DownloadManager.STATUS_SUCCESSFUL) { toast("更新包下载失败"); return; }
+                String local = cur.getString(cur.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                if (local == null) { toast("更新包路径获取失败"); return; }
+                Uri apk = Uri.parse(local);
+                Intent ins = new Intent(Intent.ACTION_VIEW);
+                ins.setDataAndType(apk, "application/vnd.android.package-archive");
+                ins.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                try { startActivity(ins); }
+                catch (Exception e) { toast("无法弹安装：" + e.getMessage()); }
+            } finally { if (cur != null) cur.close(); }
+        }
+    };
 
     private WebView web;
     private volatile String site;
@@ -77,6 +113,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         site = site();
+        dlManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        try { registerReceiver(downloadDone, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)); }
+        catch (Exception e) { Log.w("QBtun", "register download receiver failed: " + e.getMessage()); }
 
         web = new WebView(this);
         setContentView(web);
@@ -498,6 +537,107 @@ public class MainActivity extends Activity {
                 }
             });
         }
+
+        /** 当前版本名（如 1.1.05），供页面比对 */
+        @JavascriptInterface
+        public String getVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (PackageManager.NameNotFoundException e) { return ""; }
+        }
+
+        /** 检查 GitHub 最新 Release，结果回调 window.QBUpdate.onCheck(...) */
+        @JavascriptInterface
+        public void checkUpdate() {
+            netPool.execute(new Runnable() {
+                @Override public void run() {
+                    String tag = null, url = UPDATE_PAGE, err = null;
+                    HttpURLConnection conn = null;
+                    try {
+                        conn = (HttpURLConnection) new URL(UPDATE_API).openConnection();
+                        conn.setConnectTimeout(10000);
+                        conn.setReadTimeout(10000);
+                        conn.setRequestProperty("Accept", "application/vnd.github+json");
+                        conn.setRequestProperty("User-Agent", "QBtun-Android");
+                        int code = conn.getResponseCode();
+                        if (code != 200) throw new Exception("HTTP " + code);
+                        BufferedReader br = new BufferedReader(
+                                new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+                        StringBuilder sb = new StringBuilder();
+                        String line;
+                        while ((line = br.readLine()) != null) sb.append(line);
+                        br.close();
+                        JSONObject j = new JSONObject(sb.toString());
+                        tag = j.optString("tag_name", "");
+                        JSONArray assets = j.optJSONArray("assets");
+                        if (assets != null && assets.length() > 0) {
+                            JSONObject a = assets.getJSONObject(0);
+                            String dl = a.optString("browser_download_url", "");
+                            if (!dl.isEmpty()) url = dl;
+                        }
+                    } catch (Exception e) {
+                        err = e.getMessage() == null ? e.toString() : e.getMessage();
+                    } finally {
+                        if (conn != null) conn.disconnect();
+                    }
+                    final String fTag = tag, fUrl = url, fErr = err;
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            try {
+                                JSONObject r = new JSONObject();
+                                r.put("ok", fErr == null);
+                                r.put("tag", fTag == null ? "" : fTag);
+                                r.put("url", fUrl);
+                                r.put("page", UPDATE_PAGE);
+                                if (fErr != null) r.put("error", fErr);
+                                String js = "window.QBUpdate&&window.QBUpdate.onCheck("
+                                        + JSONObject.quote(r.toString()) + ")";
+                                web.evaluateJavascript(js, null);
+                            } catch (Exception e) {
+                                toast("检查结果回传失败：" + e.getMessage());
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        /** 用系统浏览器打开更新页（浏览器下载） */
+        @JavascriptInterface
+        public void openUrl(final String url) {
+            if (url == null || !url.startsWith("http")) return;
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(i);
+                    } catch (Exception e) { toast("打开浏览器失败：" + e.getMessage()); }
+                }
+            });
+        }
+
+        /** 用系统 DownloadManager 下载 APK 到默认 Download 目录，完成后自动弹安装 */
+        @JavascriptInterface
+        public void downloadApk(final String url, final String name) {
+            if (url == null || !url.startsWith("http")) return;
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        if (dlManager == null) { toast("下载服务不可用"); return; }
+                        DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+                        req.setTitle("QB囤安卓版更新");
+                        req.setDescription(name == null ? "QBtun update" : name);
+                        req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                        req.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
+                                name == null ? "QBtun-update.apk" : name);
+                        req.setMimeType("application/vnd.android.package-archive");
+                        dlManager.enqueue(req);
+                        toast("已开始下载，完成后将提示安装");
+                    } catch (Exception e) { toast("启动下载失败：" + e.getMessage()); }
+                }
+            });
+        }
     }
 
     @Override
@@ -510,5 +650,12 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         CookieManager.getInstance().flush();
+    }
+
+    @Override
+    protected void onDestroy() {
+        try { unregisterReceiver(downloadDone); } catch (Exception e) {}
+        netPool.shutdownNow();
+        super.onDestroy();
     }
 }

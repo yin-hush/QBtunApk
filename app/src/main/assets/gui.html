@@ -112,6 +112,15 @@
     .qgroup .q{min-width:88px}
     .qbar .addr{font-size:11px}
   }
+  /* 检查更新弹窗 */
+  .umask{position:fixed;inset:0;background:rgba(20,38,31,.4);z-index:1200;display:none;align-items:center;justify-content:center}
+  .umask.on{display:flex}
+  .udlg{background:var(--card);border-radius:12px;padding:20px 22px;min-width:280px;max-width:86vw;box-shadow:0 8px 28px rgba(20,38,31,.22)}
+  .udlg h3{margin:0 0 10px;font-size:16px;color:var(--ink)}
+  .udlg p{margin:0 0 8px;font-size:13px;color:var(--sub);line-height:1.6}
+  .udlg .uurl{font-size:11px;color:var(--brand);word-break:break-all;margin:0 0 14px}
+  .udlg .ubtns{display:flex;gap:8px;flex-wrap:wrap}
+  .udlg .ubtns button{flex:1;min-width:110px}
 </style>
 </head>
 <body>
@@ -144,8 +153,7 @@
   <button id="tabBill">账单</button>
   <span class="addr">三个页面同源，共用同一份登录态</span>
   <span style="flex:1"></span>
-  <button id="tabBack" title="后退（作用于当前显示的页面）">← 返回</button>
-  <button id="tabFwd" title="前进（作用于当前显示的页面）">前进 →</button>
+  <button id="btnCheckUpdate" title="检查是否有新版本">检查更新</button>
 </div>
 
 <div class="frames" id="framesBox">
@@ -175,6 +183,16 @@
     </div>
     <div class="qsum" id="qSum"></div>
     <div id="qAccounts"></div>
+  </div>
+</div>
+
+<div id="uMask" class="umask">
+  <div class="udlg">
+    <h3 id="uTitle">检查更新</h3>
+    <p id="uBody"></p>
+    <p id="uUrl" class="uurl"></p>
+    <div class="ubtns" id="uBtns"></div>
+    <div class="ubtns" style="margin-top:8px"><button id="uClose">关闭</button></div>
   </div>
 </div>
 
@@ -352,17 +370,88 @@ function tab(which){
   if (bill){ if (BILL_MODE === 'q') loadQ(false); else loadBill(); }
 }
 
-// 返回/前进：作用于当前显示的 iframe（同源，可直接操作其 history）
 let curTab = 'tool';
-function navFrame(dir){
-  const f = document.getElementById(curTab === 'origin' ? 'frameOrigin' : 'frameTool');
-  try {
-    const w = f && f.contentWindow;
-    if (w) { if (dir < 0) w.history.back(); else w.history.forward(); }
-  } catch(e){}
+
+/* ── 检查更新（安卓桥接；非安卓环境降级提示）── */
+const UA = () => window.QBAndroid || null;
+const $u = s => document.querySelector(s);
+function uShow(title, body, url, buttons){
+  $('#uTitle').textContent = title;
+  $('#uBody').innerHTML = body || '';
+  const u = $('#uUrl');
+  u.textContent = url || ''; u.style.display = url ? '' : 'none';
+  const box = $('#uBtns'); box.innerHTML = '';
+  (buttons || []).forEach(b => {
+    const el = document.createElement('button');
+    el.textContent = b.label;
+    if (b.primary) el.className = 'primary';
+    el.onclick = b.fn;
+    box.appendChild(el);
+  });
+  $('#uMask').classList.add('on');
 }
-$('#tabBack').onclick = () => navFrame(-1);
-$('#tabFwd').onclick  = () => navFrame(1);
+function closeUpdate(){ $('#uMask').classList.remove('on'); }
+$('#uClose').onclick = closeUpdate;
+$('#uMask').addEventListener('click', e => { if (e.target.id === 'uMask') closeUpdate(); });
+
+// 版本比较：1.1.05 vs v1.1.05，按数字段比；newer>0 表示 latest 更新
+function verCompare(a, b){
+  const nums = s => String(s || '').replace(/^v/i, '').split(/[.\-]/).map(x => parseInt(x, 10) || 0);
+  const x = nums(a), y = nums(b), n = Math.max(x.length, y.length);
+  for (let i = 0; i < n; i++){
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+let updateTimer = null;
+function checkUpdate(){
+  const bridge = UA();
+  if (!bridge || typeof bridge.checkUpdate !== 'function'){
+    uShow('检查更新', '当前为网页环境，检查更新请在安卓版内使用。', '', []);
+    return;
+  }
+  uShow('检查更新', '正在连接 GitHub 检查最新版本…', '', []);
+  let done = false;
+  updateTimer = setTimeout(() => {
+    if (done) return; done = true;
+    uShow('检查更新', 'GitHub 连接失败或超时，请检查网络后重试。', '',
+      [{label:'重试', primary:true, fn:checkUpdate}]);
+  }, 16000);
+  try { bridge.checkUpdate(); }
+  catch(e){
+    if (done) return; done = true; clearTimeout(updateTimer);
+    uShow('检查更新', '检查失败：' + e.message, '', [{label:'重试', primary:true, fn:checkUpdate}]);
+  }
+}
+window.QBUpdate = {
+  onCheck: function(raw){
+    if (updateTimer){ clearTimeout(updateTimer); updateTimer = null; }
+    let r = null;
+    try { r = JSON.parse(raw); } catch(e){}
+    if (!r || !r.ok){
+      uShow('检查更新', 'GitHub 连接失败' + (r && r.error ? '：' + r.error : '') + '，请检查网络后重试。', '',
+        [{label:'重试', primary:true, fn:checkUpdate}]);
+      return;
+    }
+    const cur = (UA() && UA().getVersion) ? UA().getVersion() : '';
+    const latest = r.tag || '';
+    const cmp = verCompare(latest, cur);
+    if (cmp <= 0){
+      uShow('已是最新版本', '当前版本 ' + (cur || '未知') + '，与 GitHub 最新版本一致，无需更新。', '', []);
+      return;
+    }
+    const url = r.url || r.page;
+    uShow('发现新版本', '当前版本 ' + (cur || '未知') + '，最新版本 <b>' + latest + '</b>。<br>选择下载方式：', url, [
+      {label:'浏览器下载', fn: () => { try { UA().openUrl(r.page); } catch(e){} closeUpdate(); }},
+      {label:'直接下载并安装', primary:true, fn: () => {
+        try { UA().downloadApk(url, 'QBtun-' + latest + '.apk'); } catch(e){}
+        closeUpdate();
+      }}
+    ]);
+  }
+};
+$('#btnCheckUpdate').onclick = checkUpdate;
 
 $('#tabTool').onclick   = () => tab('tool');
 $('#tabOrigin').onclick = () => tab('origin');
