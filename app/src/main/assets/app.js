@@ -513,6 +513,7 @@
       stats: S.stats, statsAt: S.statsAt, upstream: S.upstream, site: S.upstream,
       config: {
         username: c.username || '', hasPassword: !!c.password,
+        password: c.password || '', cookie: c.cookie || '',
         hasCookie: !!c.cookie || S.login === 'ok',
         cookiePreview: c.cookie ? c.cookie.slice(0, 24) + '...'
           : (S.login === 'ok' ? '由 WebView 保存' : ''),

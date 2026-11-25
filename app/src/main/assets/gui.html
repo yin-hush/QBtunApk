@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>QB囤 · 安卓版</title>
+<title>QB囤</title>
 <style>
   :root{
     --brand:#1fa987; --brand-weak:#e2f5ee; --ink:#14261f; --sub:#5e756c;
@@ -32,6 +32,7 @@
   .card h2{font-size:13px;margin:0 0 8px}
   .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
   .fld{flex:1;min-width:150px}
+  .eye-btn{padding:4px 6px;border:0;background:transparent;color:var(--sub);display:flex;align-items:center;cursor:pointer}
   label{display:block;font-size:11.5px;color:var(--sub);margin-bottom:3px}
   input{width:100%;padding:6px 9px;border:1px solid var(--line);border-radius:7px;
         background:#fff;color:var(--ink);font:inherit;font-size:12.5px}
@@ -126,7 +127,7 @@
 <body>
 
 <header>
-  <h1>QB囤 · 安卓版</h1>
+  <h1>QB囤</h1>
   <span id="badge" class="badge">启动中…</span>
   <span class="addr" id="addr"></span>
   <span class="spacer"></span>
@@ -138,8 +139,20 @@
   <h2>配置（保存在本机 App 私有存储，请勿外发）</h2>
   <div class="row">
     <div class="fld"><label>用户名</label><input id="cfgUser" autocomplete="username"></div>
-    <div class="fld"><label>密码（留空 = 不修改）</label><input id="cfgPass" type="password"></div>
-    <div class="fld"><label>CK（留空 = 清空并用密码重新登录）</label><input id="cfgCk"></div>
+    <div class="fld"><label>密码</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="cfgPass" type="password" style="flex:1">
+        <button type="button" id="cfgPassEye" title="显示/隐藏密码" aria-label="显示或隐藏密码"
+          class="eye-btn"></button>
+      </div>
+    </div>
+    <div class="fld"><label>CK</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="cfgCk" type="text" style="flex:1">
+        <button type="button" id="cfgCkEye" title="显示/隐藏CK" aria-label="显示或隐藏CK"
+          class="eye-btn"></button>
+      </div>
+    </div>
     <div class="fld" style="display:none"><label>出网代理（安卓版不使用）</label><input id="cfgProxy"></div>
     <div class="fld"><label>站点 site（config.json，接口路径在 api 段）</label><input id="cfgSite"></div>
     <div><button class="on" id="btnSave">保存并重新登录</button></div>
@@ -199,6 +212,9 @@
 <script src="/__app.js"></script>
 <script>
 const $ = s => document.querySelector(s);
+// 密码小眼睛图标：睁眼=可见，闭眼（带斜杠）=隐藏
+const EYE_OPEN = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/><line x1="3" y1="21" x2="21" y2="3"/></svg>';
 let originLoaded = false;
 
 // 能量账单 / Q币账单：精简 | 全部 | 按日精简 | q 四种展示
@@ -346,7 +362,17 @@ async function refresh(){
       b.textContent = '未登录（点「配置」填账号密码）'; b.className = 'badge';
     }
     $('#addr').textContent = '安卓版 · 同源直连 → ' + s.upstream;
+    // 配置面板打开时不覆盖用户输入（避免定时 refresh 冲掉正在改的密码/CK）
+    const cfgOpen = $('#cfgPanel').style.display === 'block';
     $('#cfgUser').value = s.config.username || '';
+    if (!cfgOpen){
+      $('#cfgPass').value = s.config.password || '';      // 回填已保存密码
+      $('#cfgCk').value = s.config.cookie || '';           // 回填已保存 CK
+      $('#cfgPass').type = 'password';
+      $('#cfgPassEye').innerHTML = EYE_SHUT;
+      $('#cfgCk').type = 'text';
+      $('#cfgCkEye').innerHTML = EYE_OPEN;
+    }
     $('#cfgProxy').value = s.config.proxy || '';
     $('#cfgSite').value = s.config.site || s.upstream || '';
     $('#cfgCk').placeholder = s.config.hasCookie ? ('当前：' + s.config.cookiePreview) : '（无 CK）';
@@ -411,11 +437,11 @@ function checkUpdate(){
     uShow('检查更新', '当前为网页环境，检查更新请在安卓版内使用。', '', []);
     return;
   }
-  uShow('检查更新', '正在连接 GitHub 检查最新版本…', '', []);
+  uShow('检查更新', '正在连接 GitHub 检查版本…', '', []);
   let done = false;
   updateTimer = setTimeout(() => {
     if (done) return; done = true;
-    uShow('检查更新', 'GitHub 连接失败或超时，请检查网络后重试。', '',
+    uShow('检查更新', 'GitHub 连接失败或超时，请检查网络或使用代理重试。', '',
       [{label:'重试', primary:true, fn:checkUpdate}]);
   }, 16000);
   try { bridge.checkUpdate(); }
@@ -430,7 +456,7 @@ window.QBUpdate = {
     let r = null;
     try { r = JSON.parse(raw); } catch(e){}
     if (!r || !r.ok){
-      uShow('检查更新', 'GitHub 连接失败' + (r && r.error ? '：' + r.error : '') + '，请检查网络后重试。', '',
+      uShow('检查更新', 'GitHub 连接失败' + (r && r.error ? '：' + r.error : '') + '，请检查网络或使用代理重试。', '',
         [{label:'重试', primary:true, fn:checkUpdate}]);
       return;
     }
@@ -438,7 +464,7 @@ window.QBUpdate = {
     const latest = r.tag || '';
     const cmp = verCompare(latest, cur);
     if (cmp <= 0){
-      uShow('已是最新版本', '当前版本 ' + (cur || '未知') + '，与 GitHub 最新版本一致，无需更新。', '', []);
+      uShow('已是最新版本', '当前版本 ' + (cur || '未知') + '，已经最新了', '', []);
       return;
     }
     const url = r.url || r.page;
@@ -460,6 +486,22 @@ $('#btnCfg').onclick = () => {
   const p = $('#cfgPanel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
 };
+$('#cfgPassEye').onclick = () => {
+  const f = $('#cfgPass');
+  const show = f.type === 'password';
+  f.type = show ? 'text' : 'password';
+  $('#cfgPassEye').innerHTML = show ? EYE_OPEN : EYE_SHUT;
+  $('#cfgPassEye').title = show ? '隐藏密码' : '显示密码';
+};
+$('#cfgPassEye').innerHTML = EYE_SHUT;   // 初始：密码隐藏
+$('#cfgCkEye').onclick = () => {
+  const f = $('#cfgCk');
+  const show = f.type === 'password';
+  f.type = show ? 'text' : 'password';
+  $('#cfgCkEye').innerHTML = show ? EYE_OPEN : EYE_SHUT;
+  $('#cfgCkEye').title = show ? '隐藏CK' : '显示CK';
+};
+$('#cfgCkEye').innerHTML = EYE_OPEN;     // 初始：CK 明文
 $('#btnRelogin').onclick = async () => {
   $('#cfgMsg').textContent = '正在重新登录…';
   try { await QB.relogin(); await refresh(); reloadFrames(); $('#cfgMsg').textContent = '已重新登录'; }
@@ -479,7 +521,7 @@ $('#btnSave').onclick = async () => {
   $('#cfgMsg').textContent = '保存并登录中…';
   try {
     const s = await QB.setConfig(body);
-    $('#cfgPass').value = ''; $('#cfgCk').value = '';
+    // 保存后保留密码/CK 显示（现在配置会回填已保存值，不再清空）
     await refresh(); reloadFrames();
     $('#cfgMsg').textContent = s.login === 'ok'
       ? '保存成功，' + ({cookie:'CK 有效已复用', password:'已用密码登录并更新 CK'}[s.source] || '登录成功')

@@ -37,11 +37,13 @@
   .hint{font-size:12px;color:var(--sub)}
   .warn{background:#fff8ec;border:1px solid #f0dcb8;color:#8a5a10;
         padding:8px 11px;border-radius:8px;font-size:12px;margin-bottom:12px}
-  .warn-sub{font-size:10px;opacity:.75;margin-left:6px}
+  .warn-sub{font-size:11px;color:#8a5a10;margin-left:4px}   /* 小字但实色，不发糊 */
   table{width:100%;border-collapse:collapse;font-size:12.5px}
   th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
   th{color:var(--sub);font-weight:600;background:#fafcfb}
   tbody tr:hover{background:#f7fbf9;cursor:pointer}
+  tbody tr.picked{background:#eaf7f1}   /* 已选行：浅绿高亮，不突兀 */
+  tbody tr.picked:hover{background:#e2f3eb}
   .tbl-wrap{overflow:auto;max-height:390px;border:1px solid var(--line);border-radius:8px}
   .tag{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--brand-weak);
        color:#137a63;font-size:11px}
@@ -139,7 +141,7 @@
     <div class="foot" id="qMeta" style="margin-top:7px">能量账单：quota_log.txt（每次启动记录）</div>
   </div>
 
-  <div class="warn">⚠️ 下面每个操作都会真实修改服务端数据，执行前会二次确认。<br>串行处理批量请求，底部执行日志全部处理完成才可退出<span class="warn-sub">（服务器响应慢；提前退，靠后的请求不发送）</span></div>
+  <div class="warn">⚠️ 串行处理批量请求，弹出执行完毕才可退出程序，否则靠后请求可能未发送到服务器<span class="warn-sub">（服务器响应慢、禁止并行请求）</span></div>
 
   <div class="card">
     <h2>1 · 今/昨日到账 <span id="todayTotals" style="font-weight:400;font-size:11.5px;color:var(--sub);margin-left:8px"></span></h2>
@@ -511,6 +513,10 @@ function render(items){
 function updateSel(){
   const boxes = document.querySelectorAll('.pick');
   const n = document.querySelectorAll('.pick:checked').length;
+  boxes.forEach(b => {
+    const tr = b.closest('tr');
+    if (tr) tr.classList.toggle('picked', b.checked);
+  });
   $('#selInfo').textContent = '已选 ' + n + ' / ' + ITEMS.length;
   $('#btnToggleAll').textContent = (boxes.length && n === boxes.length) ? '取消全选' : '全选';
 }
